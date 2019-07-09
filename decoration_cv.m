@@ -2,7 +2,7 @@
 
 % ----------------ChangeLog---------------
 % v1. 6/7/19 Initial creation with comments and brief summary. Image capture
-% v2. 
+% v2. 9/7/19 Modified structure and made basic function
 
 % ----------------ChangeLog---------------
 
@@ -19,41 +19,36 @@
 
 %% Decoration Computer Vision Pipeline
 
-% 1. RobotCell Image Laptop Test
+% i. RobotCell Image
 
-% % Create Camera Object with discovered name of webcam
-% % NOTE: change to the name of the webcam detected when 'webcamlist' command
-% % is run in terminal
-% Quirkle_Test = webcam('TOSHIBA Web Camera - HD'); 
-% 
-% % Preview image from webcam
-% capture_image(Quirkle_Test,'Laptop Test');
-% clear('Quirkle_Test');
+blockImage = webcam('USB Video Device'); 
+capture_image(blockImage,'Robot Image');
+clear('blockImage');
 
 % 1. Obtain customer's image
 
-%RobotCellCamera([1]); % Camera above Quirkle Blocks
+%customerImage = imread('sample1.jpg');
+%imshow(customerImage)
 
-customerImage = imread('sample1.jpg');
-imshow(customerImage)
-
-% 2. Identify desired 'blocks' (Quirkle colored shapes)
+% 2. Identify desired 'blocks' (Quirkle colored shapes) on customer's image
 
 % 3. Results of classification (which color and which shape)
 
 % 4. x
 
 
-%% FUNCTIONS
+% FUNCTIONS
 
-% Image capture function - saves image in current directory
 function capture_image (vid,name)
  	robotCellImage = snapshot(vid);
     imshow(robotCellImage);
     imwrite(robotCellImage, [name, datestr(datetime('now'),'_mm_dd_HH_MM_SS'), '.jpg']);
-    disp([name ' captured']);
+    disp([name 'Complete']);
 end
 
+
+%Tried running this function on Robot cell. Had issue with the format
+%of the image when trying to take image. (9/7/2019)
 function RobotCellCamera (varargin)
     close all;
     warning('off', 'images:initSize:adjustingMag');
@@ -66,8 +61,8 @@ function RobotCellCamera (varargin)
         vid1 = videoinput('winvideo', 1, 'MJPG_1600x1200');
         video_resolution1 = vid1.VideoResolution;
         nbands1 = vid1.NumberOfBands;
-        img1 = imshow(zeros([video_resolution1(2), video_resolution1(1), nbands1]), 'Parent', axe1);
-        prev1 = preview(vid1,img1);
+        img1 = imshow(zeros([video_resolution1(2), video_resolution1(1), nbands1]), 'Parent', axe1); 
+        prev1 = preview(img1);
         src1 = getselectedsource(vid1);
         src1.ExposureMode = 'manual';
         src1.Exposure = -4;
@@ -76,23 +71,5 @@ function RobotCellCamera (varargin)
         cam1_capture_func = @(~,~)capture_image(vid1,'table_img');
         prev1.ButtonDownFcn = cam1_capture_func;
         fig1.KeyPressFcn = cam1_capture_func;
-    end
-
-    %Conveyor Camera
-    if nargin == 0 || nargin == 2
-        fig2 =figure(2);
-        axe2 = axes ();
-        axe2.Parent = fig2;
-        vid2 = videoinput('winvideo', 2, 'MJPG_1600x1200');
-        video_resolution2 = vid2.VideoResolution;
-        nbands2 = vid2.NumberOfBands;
-        img2 = imshow(zeros([video_resolution2(2), video_resolution2(1), nbands2]), 'Parent', axe2);
-        prev2 = preview(vid2,img2);
-        src2 = getselectedsource(vid2);
-        src2.ExposureMode = 'manual';    
-        src2.Exposure = -4;
-        cam2_capture_func = @(~,~)capture_image(vid2,'conveyor_img');
-        fig2.KeyPressFcn = cam2_capture_func;
-        prev2.ButtonDownFcn = cam2_capture_func;
-    end
+    end   
 end
