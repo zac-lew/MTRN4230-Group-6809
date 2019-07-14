@@ -85,13 +85,4 @@ K_intrinsic = [528.3829, 0, 307.4073;
 %blank_grid = imread('blank_image.jpg');
 %imshow(blank_grid)
 
-% NOT 100% SURE IF THIS IS CORRECT
-
-% Result for Image1:
-%Rotation Matrix
- 0.1892   -0.9798   -0.0644
-    0.7799    0.1101    0.6161
-   -0.5966   -0.1668    0.7850
-
- %Translation Vector
-[-268.380521312903,133.781134838952,583.594143725301]   
+% Awaiting Moodle post regarding calibration points (14/7/19) 
