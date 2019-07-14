@@ -1,6 +1,6 @@
 % 1. Camera Calibration Process - Intrinsic (using checkerboard)
 
-% Define images to process
+%Define images to process
 imageFileNames = {'C:\Users\Jonathan\Documents\UNSW Engineering\2019\S2\MTRN4230\Group Project\A1_Images\Camera Calibration\Image2.png',...
     'C:\Users\Jonathan\Documents\UNSW Engineering\2019\S2\MTRN4230\Group Project\A1_Images\Camera Calibration\Image3.png',...
     'C:\Users\Jonathan\Documents\UNSW Engineering\2019\S2\MTRN4230\Group Project\A1_Images\Camera Calibration\Image4.png',...
@@ -51,7 +51,7 @@ worldPoints = generateCheckerboardPoints(boardSize, squareSize);
     'ImageSize', [mrows, ncols]);
 
 % Visualize pattern locations
-h2=figure; showExtrinsics(cameraParams, 'CameraCentric');
+h2=figure; showExtrinsics(cameraParams, 'CameraCentric')
 
 % FocalLength: [528.3829 527.3726]                  (f_x, f_y)
 % PrincipalPoint: [307.4073 239.0460]               (c_x, c_y)
@@ -74,15 +74,40 @@ K_intrinsic = [528.3829, 0, 307.4073;
 % 2. Camera Calibration Process - Extrinsic
 
 % Calibration points are (X Y Z)
-% T2 (175, -520, 147)
-% T3 (175, 520, 147)
-% T1 (175, 0, 147)
-% T4 (548.6, 0, 147)  
+% T2 (175, -520, 147) -> (14,280)
+% T1 (175, 0, 147) -> (795,283)
+% T3 (175, 520, 147) -> (1595,289)
+% T4 (548.6, 0, 147) -> (804,856)  
 
 % Ke = [R|t]= [r11,r12, t1; r21, r22, t2; r31,r32, t3]
 % Since all points on the chessboard are on a plane (Wz components = 0)
 
-%blank_grid = imread('blank_image.jpg');
-%imshow(blank_grid)
+% Image of grid to locate T1,T2,T3 and T4 in camera frame (u,v)
+blank_grid = imread('blank_image.jpg');
+imshow(blank_grid)
 
-% Awaiting Moodle post regarding calibration points (14/7/19) 
+% MATLAB function to solve PnP problem of extrinsics given relation between
+% world and image coordinate systems
+imagePoints = [14,280;795,283;1595,289;804,856;9,865]; % 4 x 2 array of [x,y] coordinates. 
+worldPoints = [175,-520;175, 0;175, 520;548, 0;548.6,-520]; % 4 x 3 array of [x,y,z] coordinates
+[R,t] = extrinsics(...
+     imagePoints,worldPoints,cameraParams)
+ 
+% ---------------EXTRINSINC RESULTS---------------
+% R =
+% 
+%    -0.0009    1.0000   -0.0092
+%     1.0000    0.0008   -0.0027
+%    -0.0027   -0.0092   -1.0000
+% 
+% 
+% t =
+% 
+%   320.0898 -145.7084  345.5445
+
+% ---------------EXTRINSINC RESULTS---------------
+
+
+
+
+
