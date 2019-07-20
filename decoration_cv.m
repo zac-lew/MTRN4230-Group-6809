@@ -153,6 +153,12 @@ hold off
 % Change to conveyor camera
 %MTRN4230_Image_Capture([],[]) %for conveyor camera
 
+%% 6. Send commands to Robot Arm (through Ethernet)
+
+% For each Block
+% [X,Y]
+% Angle
+
 %% FUNCTIONS
 
 function capture_image (vid,name)
