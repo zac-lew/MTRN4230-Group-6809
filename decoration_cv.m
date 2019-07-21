@@ -33,24 +33,23 @@ imshow(customerImage)
 
 doTraining = true;
 
-% ------------------------SET UP TRAINING and TEST SETS----------------
+%% ------------------------SET UP TRAINING and TEST SETS----------------
 
 % Load Training Data (using ImageLabeller - ground truth)
-%data = load('quirkleGroundTruth.mat');
-%QuirkleDataset = data.quirkleDataset;
-
-% Show Sample Training Data Image
-
-% Set random seed to ensure example training reproducibility.
-rng(0);
+data = load('quirkleGroundtruth.mat');
+QuirkleDataset = data.gTruth;
+QuirkleDataset(1:4,:)
 
 % Randomly split data into a training and test set.
-shuffledIndices = randperm(height(QuirkleDataset));
-idx = floor(0.6 * length(shuffledIndices) );
-trainingData = QuirkleDataset(shuffledIndices(1:idx),:); %60
-testData = QuirkleDataset(shuffledIndices(idx+1:end),:); %40
 
-% ------------------------CREATE DETECTION NETWORK-------------------
+% Set random seed to ensure example training reproducibility.
+%rng(0);
+%shuffledIndices = randperm(height(QuirkleDataset));
+%idx = floor(0.6 * length(shuffledIndices) );
+%trainingData = QuirkleDataset(shuffledIndices(1:idx),:); %60
+%testData = QuirkleDataset(shuffledIndices(idx+1:end),:); %40
+
+%% ------------------------CREATE DETECTION NETWORK-------------------
 
 % YOLOv2 = feature network (pre-trained CNN) & detection network (smaller
 % CNN specific to YOLO)
@@ -64,7 +63,7 @@ numClasses = width(QuirkleDataset)-1; %5
 
 % Create rest of YOLOv2 Detection Network....
 
-% ------------------------TEST MODEL ON TEST IMAGES--------------------
+%% ------------------------TEST MODEL ON TEST IMAGES--------------------
 
 % Read a test image.
 I = imread(testData.imageFilename{end});
@@ -113,11 +112,11 @@ customerImage = imread('sample1.png');
 figure
 imshow(customerImage)
 
-% %[a,b] = imcrop(customerImage);
-% rectROI = [311.51,173.51,621.98,462.98]; 
-% ROI_image = imcrop(customerImage,rectROI);
-% figure
-% imshow(ROI_image)
+%[a,b] = imcrop(customerImage);
+rectROI = [289.51,174.51,655.98,476.98]
+ROI_image = imcrop(customerImage,rectROI);
+figure
+imshow(ROI_image)
 
 % i. ---------------Find RED Object-------------
 
@@ -125,23 +124,38 @@ imshow(customerImage)
 hsv_path = rgb2hsv(customerImage);
 hsv_path = imgaussfilt(hsv_path,0.5);
 
-% Threshold for HSV - Green Square (END)
+% -Initiate Threshold Iterator-
+
+% Threshold for HSV - RED
 low_red = [0.825,0.475,0.2];
 hi_red = [1.00,1.00,1.00];
 
+% % Threshold for HSV - GREEN
+% low_red = [0.825,0.475,0.2];
+% hi_red = [1.00,1.00,1.00];
+% 
+% % Threshold for HSV - BLUE
+% low_red = [0.825,0.475,0.2];
+% hi_red = [1.00,1.00,1.00];
+% 
+% % Threshold for HSV - YELLOW
+% low_red = [0.825,0.475,0.2];
+% hi_red = [1.00,1.00,1.00];
+
 % Create mask to find pixels with desired HSV ranges (binary mask)
-mask_red = (hsv_path(:,:,1) >= low_red(1)) & (hsv_path(:,:,1) <= hi_red(1)) & ...
+mask_desired = (hsv_path(:,:,1) >= low_red(1)) & (hsv_path(:,:,1) <= hi_red(1)) & ...
     (hsv_path(:,:,2) >= low_red(2) ) & (hsv_path(:,:,2) <= hi_red(2)) & ...
     (hsv_path(:,:,3) >= low_red(3) ) & (hsv_path(:,:,3) <= hi_red(3));
 
-stats = regionprops(mask_red,'basic');
+% Finding location of block with desired color and Centroid calc
+stats = regionprops(mask_desired,'basic');
 centroids = cat(1,stats.Centroid);
 areas = cat(1,stats.Area);
-[m_red,i_red] = max(areas(:,1)); %largest contour
-start_circle_x = centroids(i_red,1);
-start_circle_y = centroids(i_red,2);
+[m_desired,i_desired] = max(areas(:,1)); 
+block_x = centroids(i_desired,1);
+block_y = centroids(i_desired,2);
 hold on
-plot(start_circle_x,start_circle_y,'bo','LineWidth',2)
+plot(block_x,block_y,'bo','LineWidth',2)
 hold off
 
 %% 4. Orientation of Blocks
@@ -152,6 +166,8 @@ hold off
 
 % Change to conveyor camera
 %MTRN4230_Image_Capture([],[]) %for conveyor camera
+
+% Call upon YOLOv2 Network
 
 %% 6. Send commands to Robot Arm (through Ethernet)
 
