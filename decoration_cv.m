@@ -107,58 +107,82 @@ expectedResults = testData(:, 2:end);
 
 %% 3. Color Filtering + Localisation
 
+% After ML detector is run:
+%* Have ID'd which shapes are needed
+%* Bounding box/centroid of each shape (hopefully)
+
+% 1. Have centroid locations [x,y] of each block from Customer image
+% 2. Required number of objects??
+block_locations = [1,2,3,4,5;1,2,3,4,5];
+num_blocks = 5; 
+
+close all
 % Testing with customer's sample image: (sample2.jpg)
 customerImage = imread('sample1.png');
-figure
-imshow(customerImage)
 
+% Create ROI
 %[a,b] = imcrop(customerImage);
-rectROI = [289.51,174.51,655.98,476.98]
+rectROI = [289.51,174.51,655.98,476.98];
 ROI_image = imcrop(customerImage,rectROI);
-figure
-imshow(ROI_image)
-
-% i. ---------------Find RED Object-------------
 
 %HSV
-hsv_path = rgb2hsv(customerImage);
+hsv_path = rgb2hsv(ROI_image);
 hsv_path = imgaussfilt(hsv_path,0.5);
 
 % -Initiate Threshold Iterator-
+color_array = zeros(1,4); % array to store which color (R,G,B,Y)
+color_hsv_low = zeros(1,3);
+color_hsv_hi = zeros(1,3);
 
-% Threshold for HSV - RED
-low_red = [0.825,0.475,0.2];
-hi_red = [1.00,1.00,1.00];
+curr_filter_on = 1;
+max_hsv = 4;
+filter_counter = num_blocks;
 
-% % Threshold for HSV - GREEN
-% low_red = [0.825,0.475,0.2];
-% hi_red = [1.00,1.00,1.00];
-% 
-% % Threshold for HSV - BLUE
-% low_red = [0.825,0.475,0.2];
-% hi_red = [1.00,1.00,1.00];
-% 
-% % Threshold for HSV - YELLOW
-% low_red = [0.825,0.475,0.2];
-% hi_red = [1.00,1.00,1.00];
+figure
+imshow(ROI_image)
 
-% Create mask to find pixels with desired HSV ranges (binary mask)
-mask_desired = (hsv_path(:,:,1) >= low_red(1)) & (hsv_path(:,:,1) <= hi_red(1)) & ...
-    (hsv_path(:,:,2) >= low_red(2) ) & (hsv_path(:,:,2) <= hi_red(2)) & ...
-    (hsv_path(:,:,3) >= low_red(3) ) & (hsv_path(:,:,3) <= hi_red(3));
+% -- extract which colors are needed for each detected shape in turn ---
+for k = 1:num_blocks 
 
-% Finding location of block with desired color and Centroid calc
-stats = regionprops(mask_desired,'basic');
-centroids = cat(1,stats.Centroid);
-areas = cat(1,stats.Area);
-[m_desired,i_desired] = max(areas(:,1)); 
-block_x = centroids(i_desired,1);
-block_y = centroids(i_desired,2);
-hold on
-plot(block_x,block_y,'bo','LineWidth',2)
-hold off
+    % Making HSV filtering dynamic and automatically iterate through all
+    % 4 HSV filter ranges
+    
+    for h = curr_filter_on:max_hsv %1:4
+        
+       [color_hsv_hi,color_hsv_low] = HSV_Iterator(h);
+    
+        % Create mask to find pixels with desired HSV ranges (binary mask) -
+        % Current iterated HSV filter    
+        mask_desired = (hsv_path(:,:,1) >= color_hsv_low(1)) & (hsv_path(:,:,1) <= color_hsv_hi(1)) & ...
+            (hsv_path(:,:,2) >= color_hsv_low(2) ) & (hsv_path(:,:,2) <= color_hsv_hi(2)) & ...
+            (hsv_path(:,:,3) >= color_hsv_low(3) ) & (hsv_path(:,:,3) <= color_hsv_hi(3));
+        %imshow(mask_desired) %debug to check which colored blocks were identified 
 
-%% 4. Orientation of Blocks
+        stats = regionprops(mask_desired,'basic');
+        centroids = cat(1,stats.Centroid);
+
+        % For each region area for a particular HSV filter,
+        % check if suitable sized area.
+
+        areas = cat(1,stats.Area); %(suitable area > 150)
+        [~,sorted_area_row] = sort(areas,'descend'); 
+
+        % Checking max number of items WITH a particular HSV filter
+        for p = 1:filter_counter
+            % block_locations(1,k) = centroids(sorted_area_row(p),1);
+            % block_locations(2,k) = centroids(sorted_area_row(p),1);        
+            if (areas(sorted_area_row(p),1) > 100)
+                hold on
+                % Only plot a + if there is a suitable sized binary area
+                plot(centroids(sorted_area_row(p),1),centroids(sorted_area_row(p),2),'g+','LineWidth',0.5)            
+            else
+                break;
+            end
+        end 
+    end
+end
+
+% 4. Orientation of Blocks
 
 % Image processing to determine orientation of blocks
 
@@ -176,6 +200,29 @@ hold off
 % Angle
 
 %% FUNCTIONS
+
+function [color_hsv_hi,color_hsv_low] = HSV_Iterator(counter)
+    if (counter == 1)
+        % Threshold for HSV - RED
+        color_hsv_low = [0.825,0.475,0.2];
+        color_hsv_hi = [1.00,1.00,1.00];
+    end
+    if (counter == 2)
+        % Threshold for HSV - GREEN
+        color_hsv_low = [0.219,0.266,0.084];
+        color_hsv_hi = [0.421,1.00,0.378];
+    end
+    if (counter == 3)
+        % Threshold for HSV - BLUE
+        color_hsv_low = [0.542,0.502,0.00];
+        color_hsv_hi = [0.801,1.00,0.807];
+    end
+    if (counter == 4)
+        % Threshold for HSV - YELLOW
+        color_hsv_low = [0.122,0.335,0.552];
+        color_hsv_hi = [0.222,0.936, 0.850];
+    end
+end
 
 function capture_image (vid,name)
   snapshot = getsnapshot(vid);
