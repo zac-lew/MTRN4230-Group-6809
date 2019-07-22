@@ -4,6 +4,7 @@
 % v1. 6/7/19 Initial creation with comments and brief summary. Image capture
 % v2. 15/7/19 Improved image capture at robot cell
 % v3. 18/7/19 Added in structure for YOLOv2 network
+% v4. 21/7/19 Add in color detection code (initial)
 % ----------------ChangeLog---------------
 
 % Computer Vision Engineer (Decoration)
@@ -36,9 +37,9 @@ doTraining = true;
 %% ------------------------SET UP TRAINING and TEST SETS----------------
 
 % Load Training Data (using ImageLabeller - ground truth)
-data = load('quirkleGroundtruth.mat');
-QuirkleDataset = data.gTruth;
-QuirkleDataset(1:4,:)
+%data = load('quirkleGroundtruth.mat');
+%QuirkleDataset = data.gTruth;
+%QuirkleDataset(1:4,:)
 
 % Randomly split data into a training and test set.
 
@@ -105,6 +106,7 @@ expectedResults = testData(:, 2:end);
 % Evaluate the object detector using average precision metric.
 [ap, recall, precision] = evaluateDetectionPrecision(results, expectedResults);
 
+
 %% 3. Color Filtering + Localisation
 
 % After ML detector is run:
@@ -118,11 +120,12 @@ num_blocks = 5;
 
 close all
 % Testing with customer's sample image: (sample2.jpg)
-customerImage = imread('sample1.png');
+customerImage = imread('sample1.jpg');
 
 % Create ROI
 %[a,b] = imcrop(customerImage);
-rectROI = [289.51,174.51,655.98,476.98];
+%rectROI = [289.51,174.51,655.98,476.98];
+rectROI = [341.510000000000,216.510000000000,854.980000000000,656.980000000000];
 ROI_image = imcrop(customerImage,rectROI);
 
 %HSV
@@ -137,49 +140,66 @@ color_hsv_hi = zeros(1,3);
 curr_filter_on = 1;
 max_hsv = 4;
 filter_counter = num_blocks;
+block_counter = 0;
 
 figure
 imshow(ROI_image)
 
-% -- extract which colors are needed for each detected shape in turn ---
-for k = 1:num_blocks 
 
     % Making HSV filtering dynamic and automatically iterate through all
     % 4 HSV filter ranges
     
-    for h = curr_filter_on:max_hsv %1:4
+ for h = curr_filter_on:max_hsv 
         
-       [color_hsv_hi,color_hsv_low] = HSV_Iterator(h);
+    [color_hsv_hi,color_hsv_low] = HSV_Iterator(h);
     
-        % Create mask to find pixels with desired HSV ranges (binary mask) -
-        % Current iterated HSV filter    
-        mask_desired = (hsv_path(:,:,1) >= color_hsv_low(1)) & (hsv_path(:,:,1) <= color_hsv_hi(1)) & ...
+    % Create mask to find pixels with desired HSV ranges (binary mask) -
+    % Current iterated HSV filter    
+    mask_desired = (hsv_path(:,:,1) >= color_hsv_low(1)) & (hsv_path(:,:,1) <= color_hsv_hi(1)) & ...
             (hsv_path(:,:,2) >= color_hsv_low(2) ) & (hsv_path(:,:,2) <= color_hsv_hi(2)) & ...
             (hsv_path(:,:,3) >= color_hsv_low(3) ) & (hsv_path(:,:,3) <= color_hsv_hi(3));
-        %imshow(mask_desired) %debug to check which colored blocks were identified 
 
-        stats = regionprops(mask_desired,'basic');
-        centroids = cat(1,stats.Centroid);
+    stats = regionprops(mask_desired,'basic');
+    centroids = cat(1,stats.Centroid);
 
-        % For each region area for a particular HSV filter,
-        % check if suitable sized area.
+    % For each region area for a particular HSV filter,
+    % check if suitable sized area.
 
-        areas = cat(1,stats.Area); %(suitable area > 150)
-        [~,sorted_area_row] = sort(areas,'descend'); 
+    areas = cat(1,stats.Area); %(suitable area > 150)
+    [sort_area_m,sorted_area_row] = sort(areas,'descend'); 
 
-        % Checking max number of items WITH a particular HSV filter
-        for p = 1:filter_counter
-            % block_locations(1,k) = centroids(sorted_area_row(p),1);
-            % block_locations(2,k) = centroids(sorted_area_row(p),1);        
-            if (areas(sorted_area_row(p),1) > 100)
-                hold on
-                % Only plot a + if there is a suitable sized binary area
-                plot(centroids(sorted_area_row(p),1),centroids(sorted_area_row(p),2),'g+','LineWidth',0.5)            
-            else
-                break;
-            end
-        end 
-    end
+    % Checking max number of items WITH a particular HSV filter
+    for p = 1:filter_counter
+            
+       % block_locations(1,k) = centroids(sorted_area_row(p),1);
+       % block_locations(2,k) = centroids(sorted_area_row(p),1);   
+       min_block_size = 120;
+            
+      [color_row,color_col] = size(sort_area_m); 
+        if (color_row == 1)
+            continue;
+        end
+            
+        if (sort_area_m(p,1) >= min_block_size)
+            hold on
+            % Only plot a + if there is a suitable sized binary area
+            plot(centroids(sorted_area_row(p),1),centroids(sorted_area_row(p),2),'g+','LineWidth',0.5)
+            block_counter = block_counter + 1;
+        else
+            % not even one suitable block was found in particular color
+            continue;
+        end
+    end 
+ end
+
+% Match detected shape with detected color
+yolo_block_check = sprintf('Number of ML blocks detected: %f', num_blocks);
+disp(yolo_block_check)
+block_check = sprintf('Number of blocks detected: %f', block_counter);
+disp(block_check)
+
+if (block_counter ~= num_blocks)
+    disp('Error')
 end
 
 % 4. Orientation of Blocks
@@ -214,8 +234,8 @@ function [color_hsv_hi,color_hsv_low] = HSV_Iterator(counter)
     end
     if (counter == 3)
         % Threshold for HSV - BLUE
-        color_hsv_low = [0.542,0.502,0.00];
-        color_hsv_hi = [0.801,1.00,0.807];
+        color_hsv_low = [0.542,0.290,0.20];
+        color_hsv_hi = [0.801,1.00,0.807];        
     end
     if (counter == 4)
         % Threshold for HSV - YELLOW
