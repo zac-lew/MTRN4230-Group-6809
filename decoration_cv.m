@@ -37,9 +37,10 @@ doTraining = true;
 
 %% ------------------------SET UP TRAINING and TEST SETS----------------
 
-% Load Training Data (using ImageLabeller - ground truth)
-%data = load('qLabels.mat');
-%QuirkleDataset = data.gTruth; %(export to workspace directly?)
+% Training Data (ground truth) -> Loaded directly into workspace
+% as gTruth object
+
+% Need to add image path as first column in dataset
 
 % Randomly split data into a training and test set.
 % Set random seed to ensure example training reproducibility.
@@ -85,36 +86,49 @@ featureLayer = 'activation_40_relu';
 % Create the YOLO v2 object detection network. 
 lgraph = yolov2Layers(imageSize,numClasses,anchorBoxes,baseNetwork,featureLayer);
 
-% % Training YOLOv2
+% Training YOLOv2
+
+ % Configure the training options. 
+    %  * Lower the learning rate to 1e-3 to stabilize training. 
+    %  * Set CheckpointPath to save detector checkpoints to a temporary
+    %    location. If training is interrupted due to a system failure or
+    %    power outage, you can resume training from the saved checkpoint.
+    options = trainingOptions('sgdm', ...
+        'MiniBatchSize', 16, ....
+        'InitialLearnRate',1e-3, ...
+        'MaxEpochs',15,...
+        'CheckpointPath', tempdir, ...
+        'Shuffle','every-epoch');    
+    
+trainingData = objectDetectorTrainingData(gTruth);
+    
+% Train YOLO v2 detector.
+[detector,info] = trainYOLOv2ObjectDetector(trainingData,lgraph,options);
+
+% Verify Training accuracy
 % 
-%  % Configure the training options. 
-%     %  * Lower the learning rate to 1e-3 to stabilize training. 
-%     %  * Set CheckpointPath to save detector checkpoints to a temporary
-%     %    location. If training is interrupted due to a system failure or
-%     %    power outage, you can resume training from the saved checkpoint.
-%     options = trainingOptions('sgdm', ...
-%         'MiniBatchSize', 16, ....
-%         'InitialLearnRate',1e-3, ...
-%         'MaxEpochs',10,...
-%         'CheckpointPath', tempdir, ...
-%         'Shuffle','every-epoch');    
-%     
-% % Train YOLO v2 detector.
-% [detector,info] = trainYOLOv2ObjectDetector(vehicleDataset,lgraph,options);
+% figure
+% plot(info.TrainingLoss)
+% grid on
+% xlabel('Number of Iterations')
+% ylabel('Training Loss for Each Iteration')
 
-%% ------------------------TEST MODEL ON A TEST IMAGES--------------------
+%% ------------------------TEST MODEL ON A TEST IMAGE--------------------
 
-% Read a test image.
-I = imread(testData.imageFilename{end});
+% Read a test image. (From file)
+I = imread('.\YOLO_TEST\t1.jpg');
 
 % Run the detector.
 [bboxes,scores] = detect(detector,I);
 
-% Annotate detections in the image.
-I = insertObjectAnnotation(I,'rectangle',bboxes,scores);
-imshow(I)
+% Display detection results
+if(~isempty(bboxes))
+    I  = insertObjectAnnotation(I ,'rectangle',bboxes,scores);
+end
+figure
+imshow(I )
 
-%% ------------------------TEST MODEL ON TEST SET--------------------
+%% ------------------------TEST MODEL WITH TEST SET--------------------
 
 % Create a table to hold the bounding boxes, scores, and labels output by
 % the detector. 
@@ -148,11 +162,9 @@ expectedResults = testData(:, 2:end);
 %% 3. Color Filtering + Localisation + Classification
 
 % After ML detector is run:
-%* Have ID'd which shapes are needed
-%* Bounding box/centroid of each shape (hopefully)
-
-% 1. Have centroid locations [x,y] of each block from Customer image
-% 2. Detect Required number of objects??
+% 1) Have ID'd which shapes are needed
+% 2) Approx Bounding box/centroid of each shape
+% 3) Number of blocks detected
 
 block_locations = [1,2,3,4,5;1,2,3,4,5];
 
@@ -267,7 +279,7 @@ end
 
 % 6. Confirm PLACE coordinates
 
-%load('robotCellCalib.mat', 'robotCellSession');
+%load('robotCellCalib.mat', 'calibrationSession');
 
 % From Extrinsic function output
 translationVector = [21.6771020996404,-377.712398323210,859.963449998696];
@@ -281,7 +293,7 @@ rotationMatrix = [-0.000532049447634045,0.999998919650671,-0.00137026306816968;.
 
 placeCount = 1;
 
-%[x,y] = pointsToWorld(robotCellSession.CameraParameters,rotationMatrix,translationVector,(point);
+%[x,y] = pointsToWorld(calibrationSession.CameraParameters,rotationMatrix,translationVector,([x][y]);
 
 % Finalized array of data (might actually make struct later)
 cv_block_struct 
@@ -297,7 +309,6 @@ cv_block_struct
 % Change to conveyor camera
 %MTRN4230_Image_Capture([],[]) %for conveyor camera
 % Load camera calibration
-load('conveyorCalib.mat', 'conveyorSession');
 
 % YOLOv2 Network - run conveyor until 1st desired bock. stop conveyor
 
