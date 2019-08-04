@@ -1,4 +1,7 @@
 % Analysing anchor box metrics for YOLOv2
+% Adapted from tutorial at:
+% https://au.mathworks.com/help/vision/ug/estimate-anchor-boxes-using-clustering-for-deep-learning.html
+
 
 load('trainingData.mat');
 
@@ -57,3 +60,23 @@ plot(1:maxNumAnchors, meanIoU,'-o')
 ylabel("Mean IoU")
 xlabel("Number of Anchors")
 title("Number of Anchors vs. Mean IoU")
+
+function dist = iouDistanceMetric(boxWidthHeight,allBoxWidthHeight)
+% Return the IoU distance metric. The bboxOverlapRatio function
+% is used to produce the IoU scores. The output distance is equal
+% to 1 - IoU.
+
+% Add x and y coordinates to box widths and heights so that
+% bboxOverlapRatio can be used to compute IoU.
+boxWidthHeight = prefixXYCoordinates(boxWidthHeight);
+allBoxWidthHeight = prefixXYCoordinates(allBoxWidthHeight);
+
+% Compute IoU distance metric.
+dist = 1 - bboxOverlapRatio(allBoxWidthHeight, boxWidthHeight);
+end
+
+function boxWidthHeight = prefixXYCoordinates(boxWidthHeight)
+% Add x and y coordinates to boxes.
+n = size(boxWidthHeight,1);
+boxWidthHeight = [ones(n,2) boxWidthHeight];
+end
