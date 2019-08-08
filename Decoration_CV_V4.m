@@ -8,15 +8,13 @@
 % v5. 1/8/19 Added in camera calibration for robotcell and conveyor (TBD). 
 % v6. 4/8/19 Finetuned YOLOv2 implementation
 % v7. 7/8/19 Changed to Faster R-CNN. Training better + 2018b compatible
+%            Added in conversion from image to world for PLACE coordinates
+% v8/ 9/8/19
 % ----------------ChangeLog---------------
 
 % Computer Vision Engineer (Decoration)
 % 1. Detect Quirkle blocks as they are supplied using the conveyor (ML)
 % 2. Detect the customer's desired decorating pattern from robot cell camera (ML/CV)
-
-% Customer's IMAGE::
-% Location = x,y for blocks? (target locations)
-% Type of Block = Shape + Colour
 
 % Shapes == (criss cross, clover, starburst, square, diamond, circle}
 % Color == (red, blue, green, yellow)
@@ -25,8 +23,8 @@
 
 %% 1. Obtain Customer Image @ Robot CEll
 
-% Testing with customer's sample image: (sample2.jpg)
-customerImage = imread('sample1.jpg');
+% Testing with customer's sample image:
+customerImage = imread('.\YOLO_TEST\Test8.jpg');
 imshow(customerImage)
 
 %(LATER ON USE ROBOT CELL CAMERA)
@@ -36,22 +34,14 @@ imshow(customerImage)
 %% ------------------------SET UP TRAINING and TEST SETS----------------
 
 % Load training data
-load('trainingData.mat'); 
-
-% Modify path to training dataset
-% for Tdata_counter = 1: height(YtrainingData)
-%     [filepath,name,ext] = fileparts(YtrainingData.imageFilename{Tdata_counter});
-%     % NOTE: change the directory to the current working directory
-%     new_path = fullfile();
-%     YtrainingData.imageFilename{Tdata_counter} = new_path;
-% end
+load('trainingData.mat');
 
 % Set random seed to ensure example training reproducibility.
-rng(9);
+rng(8);
 
 % Randomly split data into a training and test set.
 shuffledIndices = randperm(height(YtrainingData));
-idx = floor(0.70 * length(shuffledIndices) );
+idx = floor(0.60 * length(shuffledIndices) );
 trainingData = YtrainingData(shuffledIndices(1:idx),:);
 testData = YtrainingData(shuffledIndices(idx+1:end),:);
 
@@ -81,14 +71,31 @@ imshow(I)
         'VerboseFrequency',5,....
         'Shuffle','every-epoch');    
 
-% -------------Testing Faster-RCNN------------------
+% -------------Faster-RCNN------------------
+usePretrainedFRCNN = false; 
+
+if (usePretrainedFRCNN == false)
+    % When requiring training
  [detector, info] = trainFasterRCNNObjectDetector(trainingData, 'resnet50', options, ...
         'NegativeOverlapRange', [0 0.3], ...
-        'PositiveOverlapRange', [0.6 1]);
+        'PositiveOverlapRange', [0.6 1]);   
+
+else
+    % When using pretrained FRCNN
+    
+    % Load detector into workspace
+    load('rcnn_1.mat');
+    detector = rcnn_1.detector;
+    disp('Detector Loaded!');
+    % Load test dataset
+    % load('testData.mat'); % From external computer (to ensure no test image
+    % is actually from training set
+
+end
 
 % Plot training accuracy / interation
 % figure
-% plot(info.TrainingLoss)
+% plot(Trained_FRCNN_1.info.TrainingLoss)
 % grid on
 % xlabel('Number of Iterations')
 % ylabel('Training Loss for Each Iteration')
@@ -99,25 +106,22 @@ imshow(I)
 % NOTE: The minimum input image size must be equal to or greater
 % than the input size in image input layer of the network.
 
-% Load detector into workspace
-%load('trained_FasterRCNN.mat')
-%detector = trained_FasterRCNN.detector;
-
 % Read a test image.
 I = imread(testData.imageFilename{1});
 
 % Run the detector.
-[bboxes,scores,labels] = detect(detector,I,'Threshold',0.20)
+[bboxes,scores,labels] = detect(detector,I,'Threshold',0.20);
 
 % Annotate detections in the image.
 if ~isempty(bboxes)
-    I = insertObjectAnnotation(I,'rectangle',bboxes,scores,labels);
+    I = insertShape(I,'Rectangle',bboxes);
     imshow(I)
 end
 
 disp('Test Done')
 
 %% ------------------------TEST MODEL WITH TEST SET--------------------
+%----------------------------FOR EVALUATION----------------------------
 
 % Create a table to hold the bounding boxes, scores, and labels output by
 % the detector. 
@@ -147,31 +151,52 @@ expectedResults = testData(:, 2:end);
 % Evaluate the object detector using average precision metric.
 [ap, recall, precision] = evaluateDetectionPrecision(results, expectedResults);
 
+% Plot precision/recall curve
+figure
+plot(recall,precision)
+xlabel('Recall')
+ylabel('Precision')
+grid on
+title(sprintf('Average Precision = %.2f', ap))
+
+%% ------------------------RUN MODEL ON CUSTOMER IMAGE--------------------
+
+% Run the Qwirkle detector.
+[bboxes,scores,labels] = detect(detector,customerImage,'Threshold',0.175);
+
+% Annotate detections in the image.
+if ~isempty(bboxes)
+    customerImage = insertObjectAnnotation(customerImage,'rectangle',bboxes,scores);
+    imshow(customerImage)
+end
+
+disp('ML on Customer Image DONE!')
 
 %% 3. Color Filtering + Localisation
 
 % After ML detector is run:
 % 1) Labels of which Shape that was detected
 % 2) Approx Bounding box/centroid of each shape
-% 3) Number of blocks detected?
+% 3) Number of blocks detected (length of BB)
 
 close all
-customerImage = imread('.\YOLO_TEST\test6.jpg');
-num_blocks = 2; 
+num_blocks = 6; 
 
 % Create ROI
 %[a,b] = imcrop(customerImage);
-rectROI = [542.51,303.51,515.98,444.98];
+rectROI = [506.51,239.51,576.98,581.98];
 ROI_image = imcrop(customerImage,rectROI);
 
-% Initial image processing (to remove noise + errant grid lines)
-
+% Initial image processing
+%(to remove noise + errant grid lines)
+SE = strel('square',2);
+ROI_image = imdilate(ROI_image,SE);
 
 % ---------------------Detect Colors----------------------
 %HSV
 %hsv_path = rgb2hsv(customerImage);
 hsv_path = rgb2hsv(ROI_image);
-hsv_path = imgaussfilt(hsv_path,0.5);
+hsv_path = imgaussfilt(hsv_path,0.75);
 
 % -Initiate Threshold Iterator-
 color_array = zeros(1,4); % array to store which color (R,G,B,Y)
@@ -194,7 +219,7 @@ imshow(ROI_image)
     % Making HSV filtering dynamic and automatically iterate through all
     % 4 HSV filter ranges
     
- for h = curr_filter_on:max_hsv 
+for h = curr_filter_on:max_hsv % encoding RGBY as 1234
         
     [color_hsv_hi,color_hsv_low] = HSV_Iterator(h);
     
@@ -217,7 +242,7 @@ imshow(ROI_image)
             
        % block_locations(1,k) = centroids(sorted_area_row(p),1);
        % block_locations(2,k) = centroids(sorted_area_row(p),1);   
-       min_block_size = 130;
+       min_block_size = 80;
             
       [color_row,color_col] = size(sort_area_m); 
       % Error handling if no suitably sized object with color is present
@@ -228,7 +253,7 @@ imshow(ROI_image)
         if (sort_area_m(p,1) >= min_block_size)
             hold on
             % Only plot a + if there is a suitable sized binary area
-            plot(centroids(sorted_area_row(p),1),centroids(sorted_area_row(p),2),'g+','LineWidth',0.5)
+            plot(centroids(sorted_area_row(p),1),centroids(sorted_area_row(p),2),'g+','LineWidth',1)
             cv_block_struct(1,block_struct_row) = centroids(sorted_area_row(p),1);
             cv_block_struct(2,block_struct_row) = centroids(sorted_area_row(p),2);
             cv_block_struct(3,block_struct_row) = h; % which HSV filter was used
@@ -241,8 +266,8 @@ imshow(ROI_image)
     end 
  end
  
- % debug show the results of shape detection
- cv_block_struct
+ % debug show the results of computer vision color/pose detection
+ cv_block_struct;
 
 % 3. Error checking;
 yolo_block_check = sprintf('Number of ML blocks detected: %f', num_blocks);
@@ -257,19 +282,31 @@ end
 %% ---------------------Match Shape with Color----------------------
 
 % Check which detected shape is in which color (compare centroids)
-% block_locations = x,y of bb position and shape detected. bboxes
 % cv_block_struct = x,y of centroid and which hsv filter it had used.
+% analyse rows 1 (x) and rows 2 (y)
+% bboxes is array of bounding boxes of detected shapes
+% [x,y,x_length,y_length] where [x,y] = upper-left corner of BB
 
+for j = 1 : num_blocks
+    
+end
 
+% Display Results!
+% eg: Green Clover, Red Starburst
 
 %% ---------------------Orientation of Blocks----------------------
-
 % Image processing to determine orientation of blocks
-% SURF?
+% Call function for each detected block in turn
 
+% 120 x 120. make image around each centroid
+
+aligned_block = imread('block_45_pos.jpg');
+aligned_block = rgb2gray(aligned_block);
+block_angle = checkBlockOrientation(aligned_block)
 
 
 %% ---------------------Place Coordinates----------------------
+% Applied to whole image struct (after it has been filled)
 
 load('calibrationSession.mat', 'calibrationSession');
 
@@ -283,31 +320,79 @@ rotationMatrix = [-0.000532049447634045,0.999998919650671,-0.00137026306816968;.
 % Convert image points to world coordinates (from struct)
 % cv_block_struct (rows 1 and 2)
 
-placeCount = 1;
-% Finalized array of data (might actually make struct later)
-cv_block_struct 
+for bCount = 1:num_blocks
 
-%[x,y] = pointsToWorld(calibrationSession.CameraParameters,rotationMatrix,translationVector,([x][y]);
+    cv_block_struct(1:2,bCount) = pointsToWorld(calibrationSession.CameraParameters,rotationMatrix,translationVector,...
+        [cv_block_struct(1,bCount),cv_block_struct(2,bCount)]);
+end
 
-%% Send commands to Robot Arm (through Ethernet)
+% Array after conversion from image to world
+cv_block_struct;
+
+%% Send PLACE Data to Robot Arm
 % For each Block:
 % 1) [X,Y] PLACE COORDINATES (WORLD frame)
-% 2) Orientation
+% 2) Orientation (add on as 4th row to the struct_array)
 
-%% 4. Detect on Conveyor Belt (Object Detection)
+
+
+%% 4. Detect on Conveyor Belt (Real-time Object Detection)
 
 % Change to conveyor camera
 %MTRN4230_Image_Capture([],[]) %for conveyor camera
 % Load camera calibration
 
-% YOLOv2 Network - run conveyor until 1st desired bock. stop conveyor
+% ML network - run conveyor until 1st desired bock. stop conveyor
 
-% Send commands to Robot Arm (through Ethernet)
+
+%% 5. Send PICK Data to Robot Arm
 % For each Block:
 % [X,Y] PICK COORDINATES (WORLD frame)
 
 
+
 %% FUNCTIONS
+
+function block_angle = checkBlockOrientation(block_image)
+
+    % SURF descriptors = encoder vector which shows regions where the image
+    % is not affected by brightness, scale or rotation
+    surf_points = detectSURFFeatures(block_image);    
+    block_original = imread('block_original_pos.jpg'); % constant reference
+    block_original = rgb2gray(block_original);
+
+    % detect SURF Features (as many blobs as possible)
+    ptsOriginal  = detectSURFFeatures(block_original,'MetricThreshold',25);
+    ptsDistorted = detectSURFFeatures(block_image,'MetricThreshold',25);
+
+    % Extract feature descriptors
+    [featuresOriginal,  validPtsOriginal]  = extractFeatures(block_original, ptsOriginal);
+    [featuresDistorted, validPtsDistorted] = extractFeatures(block_image, ptsDistorted);
+
+    % Match features
+    indexPairs = matchFeatures(featuresOriginal, featuresDistorted);
+    matchedOriginal = validPtsOriginal(indexPairs(:,1));
+    matchedDistorted = validPtsDistorted(indexPairs(:,2));
+
+    % Calculate Orientation
+    [tform,~,~] = estimateGeometricTransform(...
+        matchedDistorted, matchedOriginal, 'similarity');
+
+    Tinv  = tform.invert.T;
+    ss = Tinv(2,1);
+    sc = Tinv(1,1);
+    block_angle = round(atan2(ss,sc)*180/pi);
+    
+    % Meaningful orientations to send to robot arm
+    if (block_angle < -45 || (block_angle > 45 && block_angle < 75))
+        block_angle = 45;
+    end
+    
+    if (block_angle > 85 && block_angle < 95)
+       block_angle = 0;     
+    end
+
+end
 
 function [color_hsv_hi,color_hsv_low] = HSV_Iterator(counter)
     if (counter == 1)
@@ -327,8 +412,8 @@ function [color_hsv_hi,color_hsv_low] = HSV_Iterator(counter)
     end
     if (counter == 4)
         % Threshold for HSV - YELLOW
-        color_hsv_low = [0.122,0.335,0.552];
-        color_hsv_hi = [0.222,0.936, 0.850];
+        color_hsv_low = [0.10,0.235,0.452];
+        color_hsv_hi = [0.250,0.950, 0.850];
     end
 end
 
