@@ -9,7 +9,7 @@
 % v6. 4/8/19 Finetuned YOLOv2 implementation
 % v7. 7/8/19 Changed to Faster R-CNN. Training better + 2018b compatible
 %            Added in conversion from image to world for PLACE coordinates
-% v8/ 9/8/19
+% v8/ 9/8/19 Initial testing of fully trained ML network
 % ----------------ChangeLog---------------
 
 % Computer Vision Engineer (Decoration)
@@ -26,6 +26,11 @@
 % Testing with customer's sample image:
 customerImage = imread('.\YOLO_TEST\Test8.jpg');
 imshow(customerImage)
+
+% Create ROI
+%[a,b] = imcrop(customerImage);
+rectROI = [506.51,239.51,576.98,581.98];
+ROI_image = imcrop(customerImage,rectROI);
 
 %(LATER ON USE ROBOT CELL CAMERA)
 %MTRN4230_Image_Capture([]) %for robot cell
@@ -72,7 +77,7 @@ imshow(I)
         'Shuffle','every-epoch');    
 
 % -------------Faster-RCNN------------------
-usePretrainedFRCNN = false; 
+usePretrainedFRCNN = true; 
 
 if (usePretrainedFRCNN == false)
     % When requiring training
@@ -83,19 +88,24 @@ if (usePretrainedFRCNN == false)
 else
     % When using pretrained FRCNN
     
-    % Load detector into workspace
-    load('rcnn_1.mat');
-    detector = rcnn_1.detector;
+    % Load detector into workspace (pretrained)
+    load('FINAL_FRCNN.mat');
     disp('Detector Loaded!');
-    % Load test dataset
-    % load('testData.mat'); % From external computer (to ensure no test image
-    % is actually from training set
+    
+    % Change filepath for imageFilenames (for stats on TestData)
+    for Tdata_counter = 1 : height (testData)
+        [filepath,name,ext] = fileparts(testData.imageFilename{Tdata_counter});
+        new_path = fullfile('C:\Users\Jonathan\Documents\UNSW Engineering\2019\S2\MTRN4230\Group Project\YOLO_TRAIN\Train_800_600',[name,'.jpg']);
+        testData.imageFilename{Tdata_counter} = new_path;
+    end
+    
+    disp("TestData Filepaths Corrected");
 
 end
 
 % Plot training accuracy / interation
 % figure
-% plot(Trained_FRCNN_1.info.TrainingLoss)
+% plot(detector.info.TrainingLoss)
 % grid on
 % xlabel('Number of Iterations')
 % ylabel('Training Loss for Each Iteration')
@@ -107,10 +117,10 @@ end
 % than the input size in image input layer of the network.
 
 % Read a test image.
-I = imread(testData.imageFilename{1});
+I = imread(testData.imageFilename{2});
 
 % Run the detector.
-[bboxes,scores,labels] = detect(detector,I,'Threshold',0.20);
+[bboxes,scores,labels] = detect(detector,I,'Threshold',0.10);
 
 % Annotate detections in the image.
 if ~isempty(bboxes)
@@ -160,17 +170,20 @@ grid on
 title(sprintf('Average Precision = %.2f', ap))
 
 %% ------------------------RUN MODEL ON CUSTOMER IMAGE--------------------
+% Input image must be greater than [224 224]
 
 % Run the Qwirkle detector.
-[bboxes,scores,labels] = detect(detector,customerImage,'Threshold',0.175);
+[bboxes,scores,labels] = detect(detector,ROI_image,'Threshold',0.05);
 
 % Annotate detections in the image.
 if ~isempty(bboxes)
-    customerImage = insertObjectAnnotation(customerImage,'rectangle',bboxes,scores);
-    imshow(customerImage)
+    ROI_image = insertObjectAnnotation(ROI_image,'rectangle',bboxes,scores);
+    imshow(ROI_image)
 end
 
 disp('ML on Customer Image DONE!')
+
+% Now have bounding boxes, scores and labels
 
 %% 3. Color Filtering + Localisation
 
@@ -181,11 +194,6 @@ disp('ML on Customer Image DONE!')
 
 close all
 num_blocks = 6; 
-
-% Create ROI
-%[a,b] = imcrop(customerImage);
-rectROI = [506.51,239.51,576.98,581.98];
-ROI_image = imcrop(customerImage,rectROI);
 
 % Initial image processing
 %(to remove noise + errant grid lines)
