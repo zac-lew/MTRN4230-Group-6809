@@ -21,167 +21,68 @@
 
 %~~Decoration Computer Vision Pipeline~~
 
+%% LOAD PRE_TRAINED DETECTOR
+
+% When using pretrained FRCNN    
+% Load detector into workspace (pretrained x 2)
+%load('FINAL_FRCNN_V2.mat'); 
+%load('info.mat')
+%disp('Detector & Training Info Loaded!');  
+
 %% 1. Obtain Customer Image @ Robot CEll
 
 % Testing with customer's sample image:
-customerImage = imread('.\YOLO_TEST\Test8.jpg');
-imshow(customerImage)
-
-% Create ROI
-%[a,b] = imcrop(customerImage);
-rectROI = [506.51,239.51,576.98,581.98];
-ROI_image = imcrop(customerImage,rectROI);
+customerImage = imread('.\YOLO_TEST\Test11.jpg');
+warning('off','all');
+close all
 
 %(LATER ON USE ROBOT CELL CAMERA)
 %MTRN4230_Image_Capture([]) %for robot cell
 
-%% 2. Quirkle Blocks from Sample Image (Classification + Localisation)
-%% ------------------------SET UP TRAINING and TEST SETS----------------
+% Intial image processing before the FRCNN Detector
 
-% Load training data
-load('trainingData.mat');
+%[a,b] = imcrop(customerImage);
+rectROI = [506.51,239.51,576.98,581.98];
 
-% Set random seed to ensure example training reproducibility.
-rng(8);
+customerImage = imsharpen(customerImage,'Radius',5);
+% gray_customerImage = rgb2gray(customerImage);
+% se = strel('disk',5);
+% gray_customerImage = imbinarize(gray_customerImage,0.6);
+% dilated_g_customerImage = imdilate(gray_customerImage,se);
+% highlighted_blocks = imreconstruct(imcomplement(dilated_g_customerImage),imcomplement(gray_customerImage));
+% highlighted_blocks_c = imcomplement(highlighted_blocks);
+highlighted_blocks_c = imcrop(customerImage,rectROI);
 
-% Randomly split data into a training and test set.
-shuffledIndices = randperm(height(YtrainingData));
-idx = floor(0.60 * length(shuffledIndices) );
-trainingData = YtrainingData(shuffledIndices(1:idx),:);
-testData = YtrainingData(shuffledIndices(idx+1:end),:);
+ROI_image = imcrop(customerImage,rectROI); % CustomerImage remains as RGB for color detection
+%ROI_image = customerImage; %duplication? Though need ROI ideally to avoid unnecessary block detection
+ROI_image = imsharpen(ROI_image,'Radius',2);
 
-disp('YTraining Data loaded!');
-disp('~Training and Test Datasets Created~');
-
-% Display one of the sample training images/labelled ground Truth
-
-I = imread(trainingData.imageFilename{end});
-
-% Insert the ROI labels.
-I = insertShape(I,'Rectangle',trainingData.Starburst{end});
-
-% Resize and display image.
-I = imresize(I,3);
-imshow(I)
-
-%% ------------------------CREATE DETECTION NETWORK-------------------
-
- % Configure the training options. 
-    options = trainingOptions('sgdm', ...
-        'MiniBatchSize', 1, ....
-        'InitialLearnRate',1e-3, ...
-        'MaxEpochs',1,...
-        'Verbose',true,...
-        'CheckpointPath', tempdir, ...
-        'VerboseFrequency',5,....
-        'Shuffle','every-epoch');    
-
-% -------------Faster-RCNN------------------
-usePretrainedFRCNN = true; 
-
-if (usePretrainedFRCNN == false)
-    % When requiring training
- [detector, info] = trainFasterRCNNObjectDetector(trainingData, 'resnet50', options, ...
-        'NegativeOverlapRange', [0 0.3], ...
-        'PositiveOverlapRange', [0.6 1]);   
-
-else
-    % When using pretrained FRCNN
-    
-    % Load detector into workspace (pretrained)
-    load('FINAL_FRCNN.mat');
-    disp('Detector Loaded!');
-    
-    % Change filepath for imageFilenames (for stats on TestData)
-    for Tdata_counter = 1 : height (testData)
-        [filepath,name,ext] = fileparts(testData.imageFilename{Tdata_counter});
-        new_path = fullfile('C:\Users\Jonathan\Documents\UNSW Engineering\2019\S2\MTRN4230\Group Project\YOLO_TRAIN\Train_800_600',[name,'.jpg']);
-        testData.imageFilename{Tdata_counter} = new_path;
-    end
-    
-    disp("TestData Filepaths Corrected");
-
-end
-
-% Plot training accuracy / interation
-% figure
-% plot(detector.info.TrainingLoss)
-% grid on
-% xlabel('Number of Iterations')
-% ylabel('Training Loss for Each Iteration')
-
-
-%% ------------------------TEST MODEL ON A TEST IMAGE--------------------
-
-% NOTE: The minimum input image size must be equal to or greater
-% than the input size in image input layer of the network.
-
-% Read a test image.
-I = imread(testData.imageFilename{2});
-
-% Run the detector.
-[bboxes,scores,labels] = detect(detector,I,'Threshold',0.10);
-
-% Annotate detections in the image.
-if ~isempty(bboxes)
-    I = insertShape(I,'Rectangle',bboxes);
-    imshow(I)
-end
-
-disp('Test Done')
-
-%% ------------------------TEST MODEL WITH TEST SET--------------------
-%----------------------------FOR EVALUATION----------------------------
-
-% Create a table to hold the bounding boxes, scores, and labels output by
-% the detector. 
-numImages = height(testData);
-results = table('Size',[numImages 3],...
-    'VariableTypes',{'cell','cell','cell'},...
-    'VariableNames',{'Boxes','Scores','Labels'});
-
-% Run detector on each image in the test set and collect results.
-for i = 1:numImages
-    
-    % Read the image.
-    I = imread(testData.imageFilename{i});
-    
-    % Run the detector.
-    [bboxes,scores,labels] = detect(detector,I);
-   
-    % Collect the results.
-    results.Boxes{i} = bboxes;
-    results.Scores{i} = scores;
-    results.Labels{i} = labels;
-end
-
-% Extract expected bounding box locations from test data.
-expectedResults = testData(:, 2:end);
-
-% Evaluate the object detector using average precision metric.
-[ap, recall, precision] = evaluateDetectionPrecision(results, expectedResults);
-
-% Plot precision/recall curve
 figure
-plot(recall,precision)
-xlabel('Recall')
-ylabel('Precision')
-grid on
-title(sprintf('Average Precision = %.2f', ap))
+imshow(ROI_image)
+hold on
 
-%% ------------------------RUN MODEL ON CUSTOMER IMAGE--------------------
+disp('1. Customer Image Obtained')
+
+%% 2. Detect Quirkle Blocks from Sample Image (Classification + Localisation)
+%% ------------------------RUN ML MODEL ON CUSTOMER IMAGE--------------------
+
 % Input image must be greater than [224 224]
+% Run the Qwirkle detector on customer's image
+[bboxes,scores,labels] = detect(detector_updated,highlighted_blocks_c,'Threshold',0.1,'NumStrongestRegions',25);
 
-% Run the Qwirkle detector.
-[bboxes,scores,labels] = detect(detector,ROI_image,'Threshold',0.05);
+% Annotate BB detections in the image.
 
-% Annotate detections in the image.
-if ~isempty(bboxes)
-    ROI_image = insertObjectAnnotation(ROI_image,'rectangle',bboxes,scores);
-    imshow(ROI_image)
+% Draw BB and Labels   
+for j = 1 : size(bboxes,1)
+    
+    rectangle('Position',[bboxes(j,1),bboxes(j,2),bboxes(j,3),bboxes(j,4)],'EdgeColor'...
+          ,'r','LineWidth',2); 
+    ML_result = sprintf('%f, %s',scores(j),labels(j));
+    %disp(ML_result); 
+    text(bboxes(j,1)-10,bboxes(j,2)-15,ML_result,'FontSize',10,'Color','r','FontWeight','bold')
 end
 
-disp('ML on Customer Image DONE!')
+disp('2. DONE: Ran Faster RCNN Qwirkle Block Detector on Image')
 
 % Now have bounding boxes, scores and labels
 
@@ -192,19 +93,16 @@ disp('ML on Customer Image DONE!')
 % 2) Approx Bounding box/centroid of each shape
 % 3) Number of blocks detected (length of BB)
 
-close all
-num_blocks = 6; 
-
-% Initial image processing
-%(to remove noise + errant grid lines)
-SE = strel('square',2);
-ROI_image = imdilate(ROI_image,SE);
+%close all
 
 % ---------------------Detect Colors----------------------
+
 %HSV
 %hsv_path = rgb2hsv(customerImage);
+num_blocks = size(scores,1);
+
+%imshow(ROI_image); % ROI on cropped region of 9x9 grid (RGB Colorscape still)
 hsv_path = rgb2hsv(ROI_image);
-hsv_path = imgaussfilt(hsv_path,0.75);
 
 % -Initiate Threshold Iterator-
 color_array = zeros(1,4); % array to store which color (R,G,B,Y)
@@ -220,10 +118,6 @@ block_counter = 0;
 cv_block_struct = zeros(3,num_blocks);
 block_struct_row = 1;
 
-figure
-%imshow(customerImage)
-imshow(ROI_image)
-
     % Making HSV filtering dynamic and automatically iterate through all
     % 4 HSV filter ranges
     
@@ -236,6 +130,10 @@ for h = curr_filter_on:max_hsv % encoding RGBY as 1234
     mask_desired = (hsv_path(:,:,1) >= color_hsv_low(1)) & (hsv_path(:,:,1) <= color_hsv_hi(1)) & ...
             (hsv_path(:,:,2) >= color_hsv_low(2) ) & (hsv_path(:,:,2) <= color_hsv_hi(2)) & ...
             (hsv_path(:,:,3) >= color_hsv_low(3) ) & (hsv_path(:,:,3) <= color_hsv_hi(3));
+    
+    SE = strel('disk',2);
+    mask_desired = imdilate(mask_desired,SE);
+    
     stats = regionprops(mask_desired,'basic');
     centroids = cat(1,stats.Centroid);
 
@@ -244,13 +142,13 @@ for h = curr_filter_on:max_hsv % encoding RGBY as 1234
 
     areas = cat(1,stats.Area); %(suitable area > 150)
     [sort_area_m,sorted_area_row] = sort(areas,'descend'); 
-
+       
     % Checking max number of items WITH a particular HSV filter
     for p = 1:filter_counter
             
        % block_locations(1,k) = centroids(sorted_area_row(p),1);
        % block_locations(2,k) = centroids(sorted_area_row(p),1);   
-       min_block_size = 80;
+       min_block_size = 300;
             
       [color_row,color_col] = size(sort_area_m); 
       % Error handling if no suitably sized object with color is present
@@ -261,7 +159,7 @@ for h = curr_filter_on:max_hsv % encoding RGBY as 1234
         if (sort_area_m(p,1) >= min_block_size)
             hold on
             % Only plot a + if there is a suitable sized binary area
-            plot(centroids(sorted_area_row(p),1),centroids(sorted_area_row(p),2),'g+','LineWidth',1)
+            plot(centroids(sorted_area_row(p),1),centroids(sorted_area_row(p),2),'g+','LineWidth',1.5)
             cv_block_struct(1,block_struct_row) = centroids(sorted_area_row(p),1);
             cv_block_struct(2,block_struct_row) = centroids(sorted_area_row(p),2);
             cv_block_struct(3,block_struct_row) = h; % which HSV filter was used
@@ -272,20 +170,22 @@ for h = curr_filter_on:max_hsv % encoding RGBY as 1234
             continue;
         end
     end 
- end
- 
+end
+
  % debug show the results of computer vision color/pose detection
- cv_block_struct;
+ image_place_data = cv_block_struct; % Image coordinate frame
 
 % 3. Error checking;
-yolo_block_check = sprintf('Number of ML blocks detected: %f', num_blocks);
-disp(yolo_block_check)
-block_check = sprintf('Number of blocks detected: %f', block_counter);
-disp(block_check)
+% yolo_block_check = sprintf('Number of ML blocks detected: %f', size(scores,1));
+% disp(yolo_block_check)
+% block_check = sprintf('Number of blocks detected: %f', block_counter);
+% disp(block_check)
+% 
+% if (block_counter ~= num_blocks)
+%     disp('Error: Incorrect Number of Blocks!!')
+% end
 
-if (block_counter ~= num_blocks)
-    disp('Error: Incorrect Number of Blocks!!')
-end
+disp('3. DONE: Qwirkle Localisation and Color')
 
 %% ---------------------Match Shape with Color----------------------
 
@@ -295,26 +195,70 @@ end
 % bboxes is array of bounding boxes of detected shapes
 % [x,y,x_length,y_length] where [x,y] = upper-left corner of BB
 
-for j = 1 : num_blocks
+%for j = 1 : size(scores,1)
     
-end
+%end
 
 % Display Results!
 % eg: Green Clover, Red Starburst
 
+disp('4. NOT DONE: Matched Shape and Color ')
+
 %% ---------------------Orientation of Blocks----------------------
 % Image processing to determine orientation of blocks
 % Call function for each detected block in turn
+% 100 x 100. make image around each centroid
 
-% 120 x 120. make image around each centroid
+surfMin = 130; % minimum size for SURF detector to work
+bdim = surfMin;
+offset = 10; % pixel boundary around a block
+rect_length = 65;
+%tempROI_image = zeros(size(ROI_image,1),size(ROI_image,2));
+tempROI_image = ROI_image;
 
-aligned_block = imread('block_45_pos.jpg');
-aligned_block = rgb2gray(aligned_block);
-block_angle = checkBlockOrientation(aligned_block)
+for k = 1: size(image_place_data,2)
 
+    hold on
+    
+    % Make comparison image (for each block)
+    surf_x = image_place_data(1,k);
+    surf_y = image_place_data(2,k);
+    
+    % ROI centred on each detected block in turn
+    surf_roi = [surf_x-bdim/2,surf_y-bdim/2,bdim,bdim];
+    aligned_block = imcrop(tempROI_image,surf_roi); % CustomerImage remains as RGB for color detection
+    
+    % Convert to grayscale
+    aligned_block = rgb2gray(aligned_block);
+    block_angle = checkBlockOrientation(aligned_block);
+    
+    % Overlay 45 degrees or 0 degrees rectangle over each block
+    % Visual on rotation angle of each block
+    if (block_angle == 0)
+
+        x = [surf_x-rect_length/2 surf_x-rect_length/2 surf_x+rect_length/2 surf_x+rect_length/2 surf_x-rect_length/2];
+        y = [surf_y-rect_length/2 surf_y+rect_length/2 surf_y+rect_length/2 surf_y-rect_length/2 surf_y-rect_length/2];
+        %plot(x,y,'b', 'LineWidth',2)
+
+    else
+
+        x = [surf_x surf_x-rect_length/2 surf_x surf_x+rect_length/2 surf_x];
+        y = [surf_y-rect_length/2 surf_y surf_y+rect_length/2 surf_y surf_y-rect_length/2];
+        %plot(x,y,'b', 'LineWidth',2)
+
+    end
+
+    tempROI_image = ROI_image;
+end
+
+hold off
+
+disp('5. DONE: Block Orientation');
 
 %% ---------------------Place Coordinates----------------------
 % Applied to whole image struct (after it has been filled)
+
+disp('DONE: ML and Computer Vision at Robot Cell');
 
 load('calibrationSession.mat', 'calibrationSession');
 
@@ -335,16 +279,18 @@ for bCount = 1:num_blocks
 end
 
 % Array after conversion from image to world
-cv_block_struct;
+world_place_data = cv_block_struct; % World coordinate frame
+
+%disp('6. DONE: PLACE Coordinates');
 
 %% Send PLACE Data to Robot Arm
 % For each Block:
 % 1) [X,Y] PLACE COORDINATES (WORLD frame)
 % 2) Orientation (add on as 4th row to the struct_array)
 
+%disp('7. DONE: Sent PLACE to Robot');
 
-
-%% 4. Detect on Conveyor Belt (Real-time Object Detection)
+%% 4. Detect on Conveyor Belt (Real-time Object Detection!!)
 
 % Change to conveyor camera
 %MTRN4230_Image_Capture([],[]) %for conveyor camera
@@ -352,6 +298,10 @@ cv_block_struct;
 
 % ML network - run conveyor until 1st desired bock. stop conveyor
 
+%conveyorImage = imread('.\YOLO_TEST\C1.jpg');
+%imshow(conveyorImage)
+
+%disp('8. DONE: Detected Shapes on Conveyor');
 
 %% 5. Send PICK Data to Robot Arm
 % For each Block:
@@ -366,7 +316,7 @@ function block_angle = checkBlockOrientation(block_image)
     % SURF descriptors = encoder vector which shows regions where the image
     % is not affected by brightness, scale or rotation
     surf_points = detectSURFFeatures(block_image);    
-    block_original = imread('block_original_pos.jpg'); % constant reference
+    block_original = imread('block_0_pos.jpg'); % constant reference
     block_original = rgb2gray(block_original);
 
     % detect SURF Features (as many blobs as possible)
@@ -392,21 +342,19 @@ function block_angle = checkBlockOrientation(block_image)
     block_angle = round(atan2(ss,sc)*180/pi);
     
     % Meaningful orientations to send to robot arm
-    if (block_angle < -45 || (block_angle > 45 && block_angle < 75))
+    if ((block_angle) <= -90)
         block_angle = 45;
-    end
+    else
+        block_angle = 0;
+    end                   
     
-    if (block_angle > 85 && block_angle < 95)
-       block_angle = 0;     
-    end
-
 end
 
 function [color_hsv_hi,color_hsv_low] = HSV_Iterator(counter)
     if (counter == 1)
         % Threshold for HSV - RED
-        color_hsv_low = [0.825,0.275,0.20];
-        color_hsv_hi = [1.00,1.00,1.00];
+        color_hsv_low = [0.850,0.275,0.20];
+        color_hsv_hi = [1.00,0.800,0.800];
     end
     if (counter == 2)
         % Threshold for HSV - GREEN
