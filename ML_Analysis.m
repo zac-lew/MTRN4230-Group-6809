@@ -32,7 +32,7 @@
 I = imread(testData.imageFilename{2});
 
 % Run the detector. (detector with 2 rounds of training)
-[bboxes,scores,labels] = detect(detector,I,'Threshold',0.01);
+[bboxes,scores,labels] = detect(updated_detector,I,'Threshold',0.01);
 
 % Annotate detections in the image.
 if ~isempty(bboxes)
@@ -56,7 +56,7 @@ disp('Test Done')
         I = imread(testData.imageFilename{i});
         
         % Run the detector.
-        [bboxes, scores, labels] = detect(detector, I);
+        [bboxes, scores, labels] = detect(updated_detector, I);
         
         % Collect the results.
         % Collect the results.
@@ -78,3 +78,14 @@ xlabel('Recall')
 ylabel('Precision')
 grid on
 title(sprintf('Average Precision = %.2f', ap))
+
+%% Training loss
+% Plot training accuracy / interation
+figure
+plot(info(1).TrainingLoss)
+hold on
+plot(info(4).TrainingLoss)
+grid on
+legend('(1): Region Proposal Network','(2): Re-training Fast R-CNN using updated RPN')
+xlabel('Number of Iterations')
+ylabel('Training Loss for Each Iteration')
