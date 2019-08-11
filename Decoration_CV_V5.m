@@ -9,7 +9,8 @@
 % v6. 4/8/19 Finetuned YOLOv2 implementation
 % v7. 7/8/19 Changed to Faster R-CNN. Training better + 2018b compatible
 %            Added in conversion from image to world for PLACE coordinates
-% v8/ 9/8/19 Initial testing of fully trained ML network
+% v8/ 9/8/19 Initial testing of fully trained ML network. Matched shape and
+%            color logic.
 % ----------------ChangeLog---------------
 
 % Computer Vision Engineer (Decoration)
@@ -24,15 +25,17 @@
 %% LOAD PRE_TRAINED DETECTOR
 
 % When using pretrained FRCNN    
-% Load detector into workspace (pretrained x 2)
-%load('FINAL_FRCNN_V2.mat'); 
-%load('info.mat')
-%disp('Detector & Training Info Loaded!');  
+% Load detector into workspace (pretrained x 3)
+%load('FINAL_FRCNN_V3.mat'); 
+%disp('ML Qwirkle Detector Loaded!');  
+
+%trainingDataV3 = objectDetectorTrainingData(gTruthV6);
 
 %% 1. Obtain Customer Image @ Robot CEll
 
 % Testing with customer's sample image:
-customerImage = imread('.\YOLO_TEST\Test11.jpg');
+%customerImage = imread('.\YOLO_TEST\C1.jpg');
+customerImage = imread('.\YOLO_TEST\Test7.jpg');
 warning('off','all');
 close all
 
@@ -68,21 +71,26 @@ disp('1. Customer Image Obtained')
 
 % Input image must be greater than [224 224]
 % Run the Qwirkle detector on customer's image
-[bboxes,scores,labels] = detect(detector_updated,highlighted_blocks_c,'Threshold',0.1,'NumStrongestRegions',25);
+[bboxes,scores,labels] = detect(detector_updated_again,highlighted_blocks_c,'Threshold',0.25,'NumStrongestRegions',10);
+
+% TODO:
+% Clean up ML results if double-detections/false positives (based on score)
+[sorted_m sorted_i] = sort(scores,'descend');
+
+
 
 % Annotate BB detections in the image.
-
 % Draw BB and Labels   
 for j = 1 : size(bboxes,1)
     
     rectangle('Position',[bboxes(j,1),bboxes(j,2),bboxes(j,3),bboxes(j,4)],'EdgeColor'...
           ,'r','LineWidth',2); 
     ML_result = sprintf('%f, %s',scores(j),labels(j));
-    %disp(ML_result); 
+    disp(ML_result); 
     text(bboxes(j,1)-10,bboxes(j,2)-15,ML_result,'FontSize',10,'Color','r','FontWeight','bold')
 end
 
-disp('2. DONE: Ran Faster RCNN Qwirkle Block Detector on Image')
+disp('2. DONE: Ran F-RCNN Qwirkle Block Detector on Image')
 
 % Now have bounding boxes, scores and labels
 
@@ -148,7 +156,7 @@ for h = curr_filter_on:max_hsv % encoding RGBY as 1234
             
        % block_locations(1,k) = centroids(sorted_area_row(p),1);
        % block_locations(2,k) = centroids(sorted_area_row(p),1);   
-       min_block_size = 300;
+       min_block_size = 280;
             
       [color_row,color_col] = size(sort_area_m); 
       % Error handling if no suitably sized object with color is present
@@ -193,16 +201,65 @@ disp('3. DONE: Qwirkle Localisation and Color')
 % cv_block_struct = x,y of centroid and which hsv filter it had used.
 % analyse rows 1 (x) and rows 2 (y)
 % bboxes is array of bounding boxes of detected shapes
-% [x,y,x_length,y_length] where [x,y] = upper-left corner of BB
 
-%for j = 1 : size(scores,1)
+pick_counter = 1;
+j = 1;
+
+% shape_color array
+% row 1 = shape
+% row 2 = color
+missingCentroid = false;
+shape_color = zeros(2,size(bboxes,1));
+image_place_data = fix(image_place_data);
+while (pick_counter <= size(bboxes,1) && missingCentroid == false)
+    % each bounding box vector from FRCNN in turn
+    ROI = bboxes(pick_counter,:); 
+    while (j <= size(bboxes,1)+1)
+        % check if any of the color/centroids are in this current ROI 
+        tf = isInROI(ROI,image_place_data(1,j),image_place_data(2,j));
+        
+        if (tf == true)            
+            % Store which shape
+            shape_color(1,pick_counter) = labels(pick_counter);
+            % Store which color (matching)
+            shape_color(2,pick_counter) = image_place_data(3,j);
+            pick_counter = pick_counter + 1; % fill in shape_color array
+            % after each successful match
+            % Break out of loop
+            plot(image_place_data(1,j),image_place_data(2,j),'r*');
+            break;
+        end
+        
+        % Error handle in case of missing centroid
+        % at end of search through all existing centroids
+        % assuming that bboxes were all correct/detected
+        if (j == size(bboxes,1)+1)
+            % Can't find centroid
+                   
+            if (pick_counter < size(bboxes,1))
+                pick_counter = pick_counter + 1;
+                break;
+            else
+                missingCentroid = true; % raise flag
+                break;
+            end 
+        end
+        
+        % if tf is false (the current centroid is not in current ROI
+        j = j+1; % increment to next centroid location from CV
+    end
     
-%end
+    j = 1; % reset counter for the next centroid check
+end
 
-% Display Results!
 % eg: Green Clover, Red Starburst
+% Debug_ Interpret in shape_color array (for use at Conveyor)
+for r = 1 : size(shape_color,2)
+    matchIntepretation = sprintf('%s %s',whatShape(shape_color(1,r)),whatColor(shape_color(2,r)));
+    disp(matchIntepretation);
+end
 
-disp('4. NOT DONE: Matched Shape and Color ')
+disp('4. DONE: Matched Shape and Color ')
 
 %% ---------------------Orientation of Blocks----------------------
 % Image processing to determine orientation of blocks
@@ -270,11 +327,13 @@ rotationMatrix = [-0.000532049447634045,0.999998919650671,-0.00137026306816968;.
                 -0.00316066022432677,-0.00137193804397179,-0.999994063988857];
 
 % Convert image points to world coordinates (from struct)
-% cv_block_struct (rows 1 and 2)
+% original image = 1200 x 1600
+% rectROI = [506.51,239.51,576.98,581.98];
 
 for bCount = 1:num_blocks
 
-    cv_block_struct(1:2,bCount) = pointsToWorld(calibrationSession.CameraParameters,rotationMatrix,translationVector,...
+    cv_block_struct(1:2,bCount) = pointsToWorld(calibrationSession.CameraParameters,...
+        rotationMatrix,translationVector,...
         [cv_block_struct(1,bCount),cv_block_struct(2,bCount)]);
 end
 
@@ -291,17 +350,33 @@ world_place_data = cv_block_struct; % World coordinate frame
 %disp('7. DONE: Sent PLACE to Robot');
 
 %% 4. Detect on Conveyor Belt (Real-time Object Detection!!)
-
+close all
 % Change to conveyor camera
 %MTRN4230_Image_Capture([],[]) %for conveyor camera
-% Load camera calibration
+% Load camera calibration .mat file
 
-% ML network - run conveyor until 1st desired bock. stop conveyor
+% Run conveyor until 1st desired bock. stop conveyor
 
-%conveyorImage = imread('.\YOLO_TEST\C1.jpg');
-%imshow(conveyorImage)
+conveyorImage = imread('.\YOLO_TEST\C1.jpg');
+imshow(conveyorImage)
 
-%disp('8. DONE: Detected Shapes on Conveyor');
+% Looking through shape_col array
+% 1. Wait for detection of each Shape
+% 2. Check if right color
+
+[bboxes,scores,labels] = detect(detector_updated_again,conveyorImage,'Threshold',0.25,'NumStrongestRegions',10);
+
+% Annotate BB detections in the image.
+% Draw BB and Labels   
+for j = 1 : size(bboxes,1)    
+    rectangle('Position',[bboxes(j,1),bboxes(j,2),bboxes(j,3),bboxes(j,4)],'EdgeColor'...
+          ,'r','LineWidth',2); 
+    ML_result = sprintf('%f, %s',scores(j),labels(j));
+    disp(ML_result); 
+    text(bboxes(j,1)-10,bboxes(j,2)-15,ML_result,'FontSize',10,'Color','r','FontWeight','bold')
+end
+
+disp('8. TESTING: Detected Shapes on Conveyor');
 
 %% 5. Send PICK Data to Robot Arm
 % For each Block:
@@ -310,6 +385,56 @@ world_place_data = cv_block_struct; % World coordinate frame
 
 
 %% FUNCTIONS
+
+% Encoding for color and shape
+function shapeName = whatShape(match_shape)
+
+    if (match_shape == 1)
+        shapeName = 'Circle';
+    elseif (match_shape == 2)
+        shapeName = 'Clover';
+    elseif (match_shape == 3)
+        shapeName = 'CrissCross';
+    elseif (match_shape == 4)
+        shapeName = 'Diamond';
+    elseif (match_shape == 5)
+        shapeName = 'Square';
+    elseif (match_shape == 6)
+        shapeName = 'Starburst';
+    else
+        shapeName = '-';
+    end
+    
+end
+
+function colorName = whatColor(match_col)
+
+    if (match_col == 1)
+        colorName = 'Red';
+    elseif (match_col == 2)
+        colorName = 'Green';
+    elseif (match_col == 3)
+        colorName = 'Blue';
+    elseif (match_col == 4)
+        colorName = 'Yellow';
+    else
+        colorName = '-';
+    end
+    
+end
+
+function checkMatch = isInROI(ROI,x,y)
+
+    checkMatch = false;
+    
+    %ROI is (x,y,x_length,y_length)
+    if ((x > ROI(1) && x < ROI(1) + ROI(3)) && (y > ROI(2) && y < ROI(2) + ROI(4)))
+        checkMatch = true;
+    end
+    
+    % else checkMatch remains false
+
+end
 
 function block_angle = checkBlockOrientation(block_image)
 
@@ -368,8 +493,8 @@ function [color_hsv_hi,color_hsv_low] = HSV_Iterator(counter)
     end
     if (counter == 4)
         % Threshold for HSV - YELLOW
-        color_hsv_low = [0.10,0.235,0.452];
-        color_hsv_hi = [0.250,0.950, 0.850];
+        color_hsv_low = [0.10,0.135,0.152];
+        color_hsv_hi = [0.550,0.950, 0.850];
     end
 end
 
