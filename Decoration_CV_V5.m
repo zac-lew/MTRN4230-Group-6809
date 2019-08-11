@@ -288,7 +288,7 @@ for k = 1: size(image_place_data,2)
     block_angle = abs(checkBlockOrientation(aligned_block));
     
     block_orientation = sprintf('%d',block_angle);
-    text(surf_x-10,surf_y-15,block_orientation,'FontSize',10,'Color','b','FontWeight','bold');
+    text(surf_x-10,surf_y-40,block_orientation,'FontSize',10,'Color','b')
 
     tempROI_image = ROI_image;
 end
@@ -339,10 +339,6 @@ world_place_data = cv_block_struct; % World coordinate frame
 % Change to conveyor camera
 %MTRN4230_Image_Capture([],[]) %for conveyor camera
 % Load camera calibration .mat file
-
-% Looking through shape_col array
-% 1. Wait for detection of each Shape
-% 2. Check if right color
     
 %test = imread('.\YOLO_TEST\ConveyorImages\C1.jpg');
 %[a,b] = imcrop(test);
@@ -351,45 +347,70 @@ world_place_data = cv_block_struct; % World coordinate frame
 list = dir('.\YOLO_TEST\ConveyorImages\*.jpg');
 correctShape = false;
 
-for conveyorImage = 1:length(list)
+for conveyorImage = 1:length(list)-45
+    
     imagePath = fullfile(list(conveyorImage).folder,list(conveyorImage).name);
     cImage = imread(imagePath);
     cImage = imcrop(cImage,[515.51,4.51,675.98,720.98]);    
-    imshow(cImage);
+    figure
+    imshow(cImage);    
+            
+    [cBboxes,cScores,cLabels] = detect(detector_updated_again,cImage,'Threshold',0.15,...
+         'NumStrongestRegions',15);
     
     % Draw BB and Labels _ONLY_ if shape+color is correctly detected   
-    for j = 1 : size(shape_color,2) % looking at first shape that is in list   
+    % in current frame on conveyor
+    for j = 1 : size(shape_color,2) 
 
+        % looking at each shape that is in list  
+        % in sequential order (until detected live on conveyor)
+        
+        % Looking through shape_col array
+        % 1. Wait for detection of each Shape
+        % 2. Check if right color
+         
         while (correctShape == false)        
 
             % Look for current shape_color pair in current frame from Conveyor
-            [cBboxes,cScores,cLabels] = detect(detector_updated_again,cImage,'Threshold',0.15,...
-                'NumStrongestRegions',15);
+
             % Execute function on the current ML results
-            [check,id] = shapeCheck(cLabels,shape_color(1,j));
+            [check,id] = shapeCheck(uint8(cLabels),shape_color(1,j));
+            % true = looking through all detected labels,
+            % if one of the labels = the current shape from customer
             if (check == true)
 
                 correctShape = true;
                 hold on
                 % Annotate Shape detection result
-                rectangle('Position',[bboxes(id,1),bboxes(id,2),bboxes(id,3),bboxes(id,4)],'EdgeColor'...
-                    ,'g','LineWidth',3); 
-                ML_result = sprintf('%f, %s',scores(id),labels(id));
-                text(bboxes(id,1)-10,bboxes(id,2)-15,ML_result,'FontSize',10,'Color','r','FontWeight','bold')
-
+                rectangle('Position',[cBboxes(id,1),cBboxes(id,2),cBboxes(id,3),cBboxes(id,4)],'EdgeColor'...
+                    ,'g','LineWidth',2); 
+                C_ML_result = sprintf('%f, %s',cScores(id),cLabels(id));
+                text(cBboxes(id,1)-10,cBboxes(id,2)-15,C_ML_result,'FontSize',10,'Color','r','FontWeight','bold')
+                
                 % Stop conveyor
                 disp('--Stop the Conveyor--');
-                pause(0.5);
+                pause();
+
+                % Looking through shape_col array
+                % 2. Check if the matched shape is in right color
+                
+                % 3. If NOT, see if there were any other detected objects
+                % with the same shape and check their color
+                
+                % 4. Send PICK Data to Robot Arm
+                %disp('--Sending PICK COORDINATES--');
+
                 break;
             end    
             % else continue to scan live feed
+            % for next desired shape from customer
+            break;
         end
     end
-
+    correctShape = false; %reset flag
     pause();
+    % check next frame?
 end
-
-% Send PICK Data to Robot Arm
 
 disp('8. TESTING: Detected the Customer Shapes on Conveyor');
 
@@ -400,12 +421,13 @@ disp('8. TESTING: Detected the Customer Shapes on Conveyor');
 function [shapeFound,shapeID] = shapeCheck(curr_Labels,curr_Shape)
     
     shapeFound = false;
+    shapeID = 0;
     
     %eg: args are cLabels,shape_color(1,j)
     for k = 1 : size(curr_Labels,1)
         if (curr_Labels(k) == curr_Shape)
             shapeFound = true;
-            shapeID = k;
+            shapeID = curr_Labels(k);
         end
     end
 
