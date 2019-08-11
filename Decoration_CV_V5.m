@@ -27,15 +27,13 @@
 % When using pretrained FRCNN    
 % Load detector into workspace (pretrained x 3)
 %load('FINAL_FRCNN_V3.mat'); 
-%disp('ML Qwirkle Detector Loaded!');  
-
+disp('ML Qwirkle Detector Loaded!');  
 %trainingDataV3 = objectDetectorTrainingData(gTruthV6);
 
 %% 1. Obtain Customer Image @ Robot CEll
 
-% Testing with customer's sample image:
-%customerImage = imread('.\YOLO_TEST\C1.jpg');
-customerImage = imread('.\YOLO_TEST\Test7.jpg');
+% Testing with customer's sample image: (full resolution of 1600 x 1200)
+customerImage = imread('.\YOLO_TEST\Test7.jpg'); 
 warning('off','all');
 close all
 
@@ -287,23 +285,10 @@ for k = 1: size(image_place_data,2)
     
     % Convert to grayscale
     aligned_block = rgb2gray(aligned_block);
-    block_angle = checkBlockOrientation(aligned_block);
+    block_angle = abs(checkBlockOrientation(aligned_block));
     
-    % Overlay 45 degrees or 0 degrees rectangle over each block
-    % Visual on rotation angle of each block
-    if (block_angle == 0)
-
-        x = [surf_x-rect_length/2 surf_x-rect_length/2 surf_x+rect_length/2 surf_x+rect_length/2 surf_x-rect_length/2];
-        y = [surf_y-rect_length/2 surf_y+rect_length/2 surf_y+rect_length/2 surf_y-rect_length/2 surf_y-rect_length/2];
-        %plot(x,y,'b', 'LineWidth',2)
-
-    else
-
-        x = [surf_x surf_x-rect_length/2 surf_x surf_x+rect_length/2 surf_x];
-        y = [surf_y-rect_length/2 surf_y surf_y+rect_length/2 surf_y surf_y-rect_length/2];
-        %plot(x,y,'b', 'LineWidth',2)
-
-    end
+    block_orientation = sprintf('%d',block_angle);
+    text(surf_x-10,surf_y-15,block_orientation,'FontSize',10,'Color','b','FontWeight','bold');
 
     tempROI_image = ROI_image;
 end
@@ -314,8 +299,6 @@ disp('5. DONE: Block Orientation');
 
 %% ---------------------Place Coordinates----------------------
 % Applied to whole image struct (after it has been filled)
-
-disp('DONE: ML and Computer Vision at Robot Cell');
 
 load('calibrationSession.mat', 'calibrationSession');
 
@@ -347,44 +330,86 @@ world_place_data = cv_block_struct; % World coordinate frame
 % 1) [X,Y] PLACE COORDINATES (WORLD frame)
 % 2) Orientation (add on as 4th row to the struct_array)
 
-%disp('7. DONE: Sent PLACE to Robot');
+%disp('7. DONE: Sent PLACE Coordinates to Robot');
 
 %% 4. Detect on Conveyor Belt (Real-time Object Detection!!)
-close all
+% For each Block:
+% [X,Y] PICK COORDINATES (WORLD frame)
+
 % Change to conveyor camera
 %MTRN4230_Image_Capture([],[]) %for conveyor camera
 % Load camera calibration .mat file
 
-% Run conveyor until 1st desired bock. stop conveyor
-
-conveyorImage = imread('.\YOLO_TEST\C1.jpg');
-imshow(conveyorImage)
-
 % Looking through shape_col array
 % 1. Wait for detection of each Shape
 % 2. Check if right color
+    
+%test = imread('.\YOLO_TEST\ConveyorImages\C1.jpg');
+%[a,b] = imcrop(test);
 
-[bboxes,scores,labels] = detect(detector_updated_again,conveyorImage,'Threshold',0.25,'NumStrongestRegions',10);
+% Load simulated 'conveyor' feed from images in file
+list = dir('.\YOLO_TEST\ConveyorImages\*.jpg');
+correctShape = false;
 
-% Annotate BB detections in the image.
-% Draw BB and Labels   
-for j = 1 : size(bboxes,1)    
-    rectangle('Position',[bboxes(j,1),bboxes(j,2),bboxes(j,3),bboxes(j,4)],'EdgeColor'...
-          ,'r','LineWidth',2); 
-    ML_result = sprintf('%f, %s',scores(j),labels(j));
-    disp(ML_result); 
-    text(bboxes(j,1)-10,bboxes(j,2)-15,ML_result,'FontSize',10,'Color','r','FontWeight','bold')
+for conveyorImage = 1:length(list)
+    imagePath = fullfile(list(conveyorImage).folder,list(conveyorImage).name);
+    cImage = imread(imagePath);
+    cImage = imcrop(cImage,[515.51,4.51,675.98,720.98]);    
+    imshow(cImage);
+    
+    % Draw BB and Labels _ONLY_ if shape+color is correctly detected   
+    for j = 1 : size(shape_color,2) % looking at first shape that is in list   
+
+        while (correctShape == false)        
+
+            % Look for current shape_color pair in current frame from Conveyor
+            [cBboxes,cScores,cLabels] = detect(detector_updated_again,cImage,'Threshold',0.15,...
+                'NumStrongestRegions',15);
+            % Execute function on the current ML results
+            [check,id] = shapeCheck(cLabels,shape_color(1,j));
+            if (check == true)
+
+                correctShape = true;
+                hold on
+                % Annotate Shape detection result
+                rectangle('Position',[bboxes(id,1),bboxes(id,2),bboxes(id,3),bboxes(id,4)],'EdgeColor'...
+                    ,'g','LineWidth',3); 
+                ML_result = sprintf('%f, %s',scores(id),labels(id));
+                text(bboxes(id,1)-10,bboxes(id,2)-15,ML_result,'FontSize',10,'Color','r','FontWeight','bold')
+
+                % Stop conveyor
+                disp('--Stop the Conveyor--');
+                pause(0.5);
+                break;
+            end    
+            % else continue to scan live feed
+        end
+    end
+
+    pause();
 end
 
-disp('8. TESTING: Detected Shapes on Conveyor');
+% Send PICK Data to Robot Arm
 
-%% 5. Send PICK Data to Robot Arm
-% For each Block:
-% [X,Y] PICK COORDINATES (WORLD frame)
-
-
+disp('8. TESTING: Detected the Customer Shapes on Conveyor');
 
 %% FUNCTIONS
+
+% Check if any label from ML detector on live frame
+% matches the designated customer shape/color
+function [shapeFound,shapeID] = shapeCheck(curr_Labels,curr_Shape)
+    
+    shapeFound = false;
+    
+    %eg: args are cLabels,shape_color(1,j)
+    for k = 1 : size(curr_Labels,1)
+        if (curr_Labels(k) == curr_Shape)
+            shapeFound = true;
+            shapeID = k;
+        end
+    end
+
+end
 
 % Encoding for color and shape
 function shapeName = whatShape(match_shape)
@@ -464,14 +489,7 @@ function block_angle = checkBlockOrientation(block_image)
     Tinv  = tform.invert.T;
     ss = Tinv(2,1);
     sc = Tinv(1,1);
-    block_angle = round(atan2(ss,sc)*180/pi);
-    
-    % Meaningful orientations to send to robot arm
-    if ((block_angle) <= -90)
-        block_angle = 45;
-    else
-        block_angle = 0;
-    end                   
+    block_angle = round(atan2(ss,sc)*180/pi);            
     
 end
 
