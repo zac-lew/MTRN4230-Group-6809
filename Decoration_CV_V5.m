@@ -26,19 +26,24 @@
 
 % When using pretrained FRCNN    
 % Load detector into workspace (pretrained x 3)
-%load('FINAL_FRCNN_V3.mat'); 
+%load('FINAL_FRCNN_V4.mat'); 
 disp('ML Qwirkle Detector Loaded!');  
-%trainingDataV3 = objectDetectorTrainingData(gTruthV6);
+%trainingDataV4 = objectDetectorTrainingData(gTruthV7);
 
 %% 1. Obtain Customer Image @ Robot CEll
 
-% Testing with customer's sample image: (full resolution of 1600 x 1200)
-customerImage = imread('.\YOLO_TEST\Test7.jpg'); 
 warning('off','all');
 close all
 
-%(LATER ON USE ROBOT CELL CAMERA)
-%MTRN4230_Image_Capture([]) %for robot cell
+% Testing with customer's sample image: (full resolution of 1600 x 1200)
+customerImage = imread('.\YOLO_TEST\Test8.jpg'); 
+figure
+imshow(customerImage);
+
+%(USE ROBOT CELL CAMERA - WORKS)
+%customerImage = MTRN4230_Image_Capture([]); %for robot cell
+%figure
+%imshow(customerImage);
 
 % Intial image processing before the FRCNN Detector
 
@@ -69,23 +74,36 @@ disp('1. Customer Image Obtained')
 
 % Input image must be greater than [224 224]
 % Run the Qwirkle detector on customer's image
-[bboxes,scores,labels] = detect(detector_updated_again,highlighted_blocks_c,'Threshold',0.25,'NumStrongestRegions',10);
+ML_threshold = 0.20;
+[bboxes,scores,labels] = detect(detector_updated_final,highlighted_blocks_c,'Threshold',ML_threshold,'NumStrongestRegions',10);
 
-% TODO:
 % Clean up ML results if double-detections/false positives (based on score)
 [sorted_m sorted_i] = sort(scores,'descend');
+doubleDetect = false;
 
-
+% Comparing all the other blocks with the first block
+% for j = 2 : size(sorted_m,1) 
+%     if (sqrt((bboxes(j,2)^2-bboxes(1,2)^2)) < 10)
+%         doubleDetect = true;
+%         find()
+%     end
+% end
 
 % Annotate BB detections in the image.
 % Draw BB and Labels   
 for j = 1 : size(bboxes,1)
     
+    if (scores(j) < ML_threshold)
+        continue;
+    end
+    
     rectangle('Position',[bboxes(j,1),bboxes(j,2),bboxes(j,3),bboxes(j,4)],'EdgeColor'...
           ,'r','LineWidth',2); 
-    ML_result = sprintf('%f, %s',scores(j),labels(j));
-    disp(ML_result); 
-    text(bboxes(j,1)-10,bboxes(j,2)-15,ML_result,'FontSize',10,'Color','r','FontWeight','bold')
+    ML_result = sprintf('%0.3f,%s',scores(j),labels(j));
+    disp(ML_result);
+    ML_1 = sprintf('%0.3f',scores(j));
+    ML_2 = sprintf('%s',labels(j));
+    text(bboxes(j,1)-10,bboxes(j,2)-25,{[ML_1];[ML_2]},'FontSize',10,'Color','r','FontWeight','bold')
 end
 
 disp('2. DONE: Ran F-RCNN Qwirkle Block Detector on Image')
@@ -154,7 +172,7 @@ for h = curr_filter_on:max_hsv % encoding RGBY as 1234
             
        % block_locations(1,k) = centroids(sorted_area_row(p),1);
        % block_locations(2,k) = centroids(sorted_area_row(p),1);   
-       min_block_size = 280;
+       min_block_size = 350;
             
       [color_row,color_col] = size(sort_area_m); 
       % Error handling if no suitably sized object with color is present
@@ -164,7 +182,8 @@ for h = curr_filter_on:max_hsv % encoding RGBY as 1234
             
         if (sort_area_m(p,1) >= min_block_size)
             hold on
-            % Only plot a + if there is a suitable sized binary area
+
+            % Only plot a + if there is a suitable sized binary area           
             plot(centroids(sorted_area_row(p),1),centroids(sorted_area_row(p),2),'g+','LineWidth',1.5)
             cv_block_struct(1,block_struct_row) = centroids(sorted_area_row(p),1);
             cv_block_struct(2,block_struct_row) = centroids(sorted_area_row(p),2);
@@ -177,6 +196,15 @@ for h = curr_filter_on:max_hsv % encoding RGBY as 1234
         end
     end 
 end
+
+% Cleaning up double color localistaion errors AND outside ML results
+ % Comparing all the other blocks with the first block
+ % for j = 2 : size(sorted_m,1) 
+ %     if (sqrt((bboxes(j,2)^2-bboxes(1,2)^2)) < 10)
+ %         doubleDetect = true;
+ %     find()    
+ %     end
+ % end            
 
  % debug show the results of computer vision color/pose detection
  image_place_data = cv_block_struct; % Image coordinate frame
@@ -257,6 +285,8 @@ for r = 1 : size(shape_color,2)
     disp(matchIntepretation);
 end
 
+% 
+
 disp('4. DONE: Matched Shape and Color ')
 
 %% ---------------------Orientation of Blocks----------------------
@@ -295,6 +325,8 @@ end
 
 hold off
 
+% Desired pose Here
+
 disp('5. DONE: Block Orientation');
 
 %% ---------------------Place Coordinates----------------------
@@ -323,63 +355,64 @@ end
 % Array after conversion from image to world
 world_place_data = cv_block_struct; % World coordinate frame
 
+% MATLAB -> Ethernet. Send array (homogeneous transform matrix form - pose) 
+
 %disp('6. DONE: PLACE Coordinates');
 
-%% Send PLACE Data to Robot Arm
-% For each Block:
-% 1) [X,Y] PLACE COORDINATES (WORLD frame)
-% 2) Orientation (add on as 4th row to the struct_array)
-
-%disp('7. DONE: Sent PLACE Coordinates to Robot');
-
-%% 4. Detect on Conveyor Belt (Real-time Object Detection!!)
+%% 4a. Detect on Conveyor Belt (Simulated Conveyor)
 % For each Block:
 % [X,Y] PICK COORDINATES (WORLD frame)
-
-% Change to conveyor camera
-%MTRN4230_Image_Capture([],[]) %for conveyor camera
-% Load camera calibration .mat file
-    
-%test = imread('.\YOLO_TEST\ConveyorImages\C1.jpg');
-%[a,b] = imcrop(test);
 
 % Load simulated 'conveyor' feed from images in file
 list = dir('.\YOLO_TEST\ConveyorImages\*.jpg');
 correctShape = false;
+conv_match_ctr = 1;
+correctColor = false;
 
-for conveyorImage = 1:length(list)-45
+%[[LABELS: Circle,Clover,CrissCross,Diamond,Square,Starburst]]
+
+for conveyorImage = 1:length(list)-40
     
+    figure
     imagePath = fullfile(list(conveyorImage).folder,list(conveyorImage).name);
     cImage = imread(imagePath);
-    cImage = imcrop(cImage,[515.51,4.51,675.98,720.98]);    
-    figure
-    imshow(cImage);    
+    cImage = imcrop(cImage,[515.0,4.50,676.00,720.00]);    
+    imshow(cImage)    
+    hold on;
             
-    [cBboxes,cScores,cLabels] = detect(detector_updated_again,cImage,'Threshold',0.15,...
+    [cBboxes,cScores,cLabels] = detect(detector_updated_final,cImage,'Threshold',0.20,...
          'NumStrongestRegions',15);
     
-    % Draw BB and Labels _ONLY_ if shape+color is correctly detected   
-    % in current frame on conveyor
-    for j = 1 : size(shape_color,2) 
+     % analysing current frame
+    for j = 1 : size(shape_color,2) % for each desired shape
 
         % looking at each shape that is in list  
         % in sequential order (until detected live on conveyor)
         
-        % Looking through shape_col array
+        % Looking through shape_col array for current frame
         % 1. Wait for detection of each Shape
         % 2. Check if right color
          
         while (correctShape == false)        
 
             % Look for current shape_color pair in current frame from Conveyor
+            
+            % Skip if missing a shape from color/shape match
+            if (shape_color(1,j) == 0)
+                break;
+            end
 
             % Execute function on the current ML results
+
+            %[[LABELS: Circle,Clover,CrissCross,Diamond,Square,Starburst]]
+            % clabel can have more than the number of desired shapes
+            % (undesired blocks too)
             [check,id] = shapeCheck(uint8(cLabels),shape_color(1,j));
             % true = looking through all detected labels,
-            % if one of the labels = the current shape from customer
+            % if one of the labels = the current shape from customer image
             if (check == true)
 
-                correctShape = true;
+                correctShape = true; % if current shape from shape_col match array is detected
                 hold on
                 % Annotate Shape detection result
                 rectangle('Position',[cBboxes(id,1),cBboxes(id,2),cBboxes(id,3),cBboxes(id,4)],'EdgeColor'...
@@ -388,18 +421,47 @@ for conveyorImage = 1:length(list)-45
                 text(cBboxes(id,1)-10,cBboxes(id,2)-15,C_ML_result,'FontSize',10,'Color','r','FontWeight','bold')
                 
                 % Stop conveyor
-                disp('--Stop the Conveyor--');
-                pause();
+                ML_result = sprintf('Possible %s detected',labels(j));
+                disp(ML_result);
+                disp('Stop the Conveyor');
+                pause(0.5);
 
-                % Looking through shape_col array
+                % For the located shape:
                 % 2. Check if the matched shape is in right color
+                disp('Check if Correct Color');
+                % run HSV check @ conveyor                
+                % if yes -> correctColor = true;
+                %else correctColor = false               
+                %pause(0.5);
                 
+                if (correctColor == true)
+                    Qwirkle_Con_Match = sprintf('%d: %s %s FOUND',conv_match_ctr,whatColor(shape_color(2,j)),cLabels(id));
+                    disp(Qwirkle_Con_Match);
+                    conv_match_ctr = conv_match_ctr + 1; % max number of blocks to scan for overall
+                    correctColor = false; % reset flag
                 % 3. If NOT, see if there were any other detected objects
-                % with the same shape and check their color
+                % with the same shape and check their color                                
+                elseif (conv_match_ctr < size(shape_color,2) && correctShape == true)
+                    disp('Checking Similar Shapes');
+                    % check duplicates over array
+                end
+                pause(0.5);
                 
-                % 4. Send PICK Data to Robot Arm
-                %disp('--Sending PICK COORDINATES--');
-
+                % 4. Detected pose (match to customer's desired pose)
+                disp('Detected Orientation of a Desired Block');         
+                pause(0.5);
+               
+                % 5. Send PICK Data to Robot Arm for the designated
+                % shape/color block
+                
+                disp('Sent PICK Coordinates to Robot');                             
+                pause(0.5);
+                
+                % If a block and color is successfully found, remove this
+                % from the array so the conveyor does not look for it again
+                shape_color(1,j) = -1;                                
+                check = false; % reset current T/F detection
+                correctShape = false;
                 break;
             end    
             % else continue to scan live feed
@@ -407,18 +469,132 @@ for conveyorImage = 1:length(list)-45
             break;
         end
     end
-    correctShape = false; %reset flag
-    pause();
+    pause(0.5);
     % check next frame?
 end
 
-disp('8. TESTING: Detected the Customer Shapes on Conveyor');
+disp('7. TESTING: Detected the Customer Shapes on Conveyor');
+%% 4b. Detect on Conveyor Belt (Live conveyor Feed)
+% For each Block:
+% [X,Y] PICK COORDINATES (WORLD frame)
+    
+correctShape = false;
+conv_match_ctr = 1;
+correctColor = false;
+
+% Change to conveyor camera
+cImage = MTRN4230_Image_Capture([],[]); %for conveyor camera (get one frame)
+cImage = imcrop(cImage,[515.0,4.50,676.00,720.00]); %ROI at conveyor   
+
+% Load camera calibration .mat file
+    
+    figure
+    imshow(cImage);
+    hold on;
+            
+    [cBboxes,cScores,cLabels] = detect(detector_updated_final,cImage,'Threshold',0.20,...
+         'NumStrongestRegions',10); %detector_updated_final
+    
+    % Draw BB and Labels _ONLY_ if shape+color is correctly detected   
+    % in current frame on conveyor
+    
+    for j = 1 : size(shape_color,2) % for each desired shape
+
+        % looking at each shape that is in list  
+        % in sequential order (until detected live on conveyor)
+        
+        % Looking through shape_col array for current frame
+        % 1. Wait for detection of each Shape
+        % 2. Check if right color
+         
+        while (correctShape == false)        
+
+            % Look for current shape_color pair in current frame from Conveyor
+            
+            % Skip if missing a shape from color/shape match
+            if (shape_color(1,j) == 0)
+                break;
+            end
+
+            % Execute function on the current ML results
+
+            %[[LABELS: Circle,Clover,CrissCross,Diamond,Square,Starburst]]
+            % clabel can have more than the number of desired shapes
+            % (undesired blocks too)
+            [check,id] = shapeCheck(uint8(cLabels),shape_color(1,j));
+            % true = looking through all detected labels,
+            % if one of the labels = the current shape from customer image
+            if (check == true)
+
+                correctShape = true; % if current shape from shape_col match array is detected
+                hold on
+                % Annotate Shape detection result
+                rectangle('Position',[cBboxes(id,1),cBboxes(id,2),cBboxes(id,3),cBboxes(id,4)],'EdgeColor'...
+                    ,'g','LineWidth',2); 
+                C_ML_result = sprintf('%f, %s',cScores(id),cLabels(id));
+                text(cBboxes(id,1)-10,cBboxes(id,2)-15,C_ML_result,'FontSize',10,'Color','r','FontWeight','bold')
+                
+                % Stop conveyor
+                ML_result = sprintf('Possible %s detected',labels(j));
+                disp(ML_result);
+                disp('Stop the Conveyor');
+                pause(0.5);
+
+                % For the located shape:
+                % 2. Check if the matched shape is in right color
+                disp('Check if Correct Color');
+                % run HSV check @ conveyor                
+                % if yes -> correctColor = true;
+                %else correctColor = false               
+                %pause(0.5);
+                
+                if (correctColor == true)
+                    Qwirkle_Con_Match = sprintf('%d: %s %s FOUND',conv_match_ctr,whatColor(shape_color(2,j)),cLabels(id));
+                    disp(Qwirkle_Con_Match);
+                    correctColor = false; % reset flag
+                % 3. If NOT, see if there were any other detected objects
+                % with the same shape and check their color                                
+                elseif (conv_match_ctr < size(shape_color,2) && correctShape == true)
+                    disp('Checking Similar Shapes');
+                    % check duplicates over array
+                end
+                pause(0.5);
+                
+                % 4. Detected pose (match to customer's desired pose)
+                disp('Detected Orientation of a Desired Block');         
+                pause(0.5);
+               
+                % 5. Send PICK Data to Robot Arm for the designated
+                % shape/color block
+                
+                disp('Sent PICK Coordinates to Robot');                             
+                pause(0.5);
+                conv_match_ctr = conv_match_ctr + 1; % max number of blocks to scan for overall
+                
+                % If a block and color is successfully found, remove this
+                % from the array so the conveyor does not look for it again
+                shape_color(1,j) = -1;                                
+                check = false; % reset current T/F detection
+                correctShape = false;
+                break;
+            end    
+            % else continue to scan live feed
+            % for next desired shape from customer
+            break;
+        end
+    end
+    pause(0.5);
+    % check next frame?
+
+disp('7. TESTING: Detected the Customer Shapes on Conveyor');
 
 %% FUNCTIONS
 
 % Check if any label from ML detector on live frame
 % matches the designated customer shape/color
+     
 function [shapeFound,shapeID] = shapeCheck(curr_Labels,curr_Shape)
+%encoded shape ~ 1-6
     
     shapeFound = false;
     shapeID = 0;
@@ -427,7 +603,7 @@ function [shapeFound,shapeID] = shapeCheck(curr_Labels,curr_Shape)
     for k = 1 : size(curr_Labels,1)
         if (curr_Labels(k) == curr_Shape)
             shapeFound = true;
-            shapeID = curr_Labels(k);
+            shapeID = k;
         end
     end
 
@@ -538,29 +714,29 @@ function [color_hsv_hi,color_hsv_low] = HSV_Iterator(counter)
     end
 end
 
-function capture_image (vid,name)
-  snapshot = getsnapshot(vid);
-  imwrite(snapshot, [name, datestr(datetime('now'),'_mm_dd_HH_MM_SS'), '.jpg']);
-  disp([name ' Captured']);
-end
-
-function MTRN4230_Image_Capture (varargin)
-    close all;
+function robot_image = MTRN4230_Image_Capture (varargin)
 %Table Camera (Robot Cell)
 % {
-    if nargin == 0 || nargin == 1
+   if nargin == 0 || nargin == 1
         fig1 =figure(1);
         axe1 = axes ();
         axe1.Parent = fig1;
-        vid1 = videoinput('winvideo', 1, 'MJPG_1280x720');
+        vid1 = videoinput('winvideo', 1, 'MJPG_1600x1200');
         video_resolution1 = vid1.VideoResolution;
         nbands1 = vid1.NumberOfBands;
         img1 = imshow(zeros([video_resolution1(2), video_resolution1(1), nbands1]), 'Parent', axe1);
-        prev1 = preview(vid1,img1);
+        %prev1 = preview(vid1,img1);
         src1 = getselectedsource(vid1);
-        cam1_capture_func = @(~,~)capture_image(vid1,'QBlock_RC');
-        prev1.ButtonDownFcn = cam1_capture_func;
-        fig1.KeyPressFcn = cam1_capture_func;
+        src1.ExposureMode = 'manual';
+        src1.Exposure = -4;
+        src1.Contrast = 21;
+        src1.Brightness = 128;
+        robot_image = getsnapshot(vid1);
+        
+%         src1.Saturation = 78;
+        %cam1_capture_func = @(~,~)capture_image(vid1,'table_');
+        %prev1.ButtonDownFcn = cam1_capture_func;
+        %fig1.KeyPressFcn = cam1_capture_func;
     end
 %}
 % Conveyor Camera
@@ -573,12 +749,19 @@ function MTRN4230_Image_Capture (varargin)
         video_resolution2 = vid2.VideoResolution;
         nbands2 = vid2.NumberOfBands;
         img2 = imshow(zeros([video_resolution2(2), video_resolution2(1), nbands2]), 'Parent', axe2);
-        prev2 = preview(vid2,img2);
+        %prev2 = preview(vid2,img2);
         src2 = getselectedsource(vid2);
-        cam2_capture_func = @(~,~)capture_image(vid2,'QBlock_CON');
-        fig2.KeyPressFcn = cam2_capture_func;
-        prev2.ButtonDownFcn = cam2_capture_func;
+        src2.ExposureMode = 'manual';    
+        src2.Exposure = -4;        
+        src2.Brightness = 165;
+        src2.Contrast = 32;
+        robot_image = getsnapshot(vid2);
+       
+        %cam2_capture_func = @(~,~)capture_image(vid2,'conveyor_');
+        %fig2.KeyPressFcn = cam2_capture_func;
+        %prev2.ButtonDownFcn = cam2_capture_func;
     end
+
 %}
 end
 
