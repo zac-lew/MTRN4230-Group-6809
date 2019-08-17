@@ -37,7 +37,7 @@ warning('off','all');
 close all
 
 % Testing with customer's sample image: (full resolution of 1600 x 1200)
-customerImage = imread('.\YOLO_TEST\Test5.jpg'); 
+customerImage = imread('.\YOLO_TEST\Test13.jpg'); 
 figure
 imshow(customerImage);
 
@@ -75,22 +75,15 @@ disp('1. Customer Image Obtained')
 
 % Input image must be greater than [224 224]
 % Run the Qwirkle detector on customer's image
-ML_threshold = 0.15;
+ML_threshold = 0.29;
 [bboxes,scores,labels] = detect(detector_updated_final,highlighted_blocks_c,'Threshold',ML_threshold,'NumStrongestRegions',10);
-
 % Clean up ML results if double-detections/false positives
 [sorted_m sorted_i] = sort(scores,'descend');
 doubleDetect = false;
 %(take higher score)
 
 % -----------ERROR CHECKING-----------
-% Comparing all the other blocks with the first block
-% for j = 2 : size(sorted_m,1) 
-%     if (sqrt((bboxes(j,2)^2-bboxes(1,2)^2)) < 10)
-%         doubleDetect = true;
-%         find()
-%     end
-% end
+% Checking whether bboxes are too close (double detected)
 
 % Annotate BB detections in the image.
 % Draw BB and Labels   
@@ -158,6 +151,8 @@ for h = curr_filter_on:max_hsv % encoding RGBY as 1234
             (hsv_path(:,:,2) >= color_hsv_low(2) ) & (hsv_path(:,:,2) <= color_hsv_hi(2)) & ...
             (hsv_path(:,:,3) >= color_hsv_low(3) ) & (hsv_path(:,:,3) <= color_hsv_hi(3));
     
+%     figure
+%     imshow(mask_desired);
     SE = strel('disk',2);
     mask_desired = imdilate(mask_desired,SE);
     
@@ -175,19 +170,27 @@ for h = curr_filter_on:max_hsv % encoding RGBY as 1234
             
        % block_locations(1,k) = centroids(sorted_area_row(p),1);
        % block_locations(2,k) = centroids(sorted_area_row(p),1);   
-       min_block_size = 350;
+       min_block_size = 400;
             
-      [color_row,color_col] = size(sort_area_m); 
+      [color_row,color_col] = size(sort_area_m); %number of centroids per color
       % Error handling if no suitably sized object with color is present
-        if (color_row < num_blocks)
+        if (p > color_row)
             continue;
         end
+        
+        if (block_counter > num_blocks)
+            continue;
+        end
+        
+        if (color_row < num_blocks && sort_area_m(p,1) < min_block_size)
+            continue;
+        end                
             
         if (sort_area_m(p,1) >= min_block_size)
             hold on
 
             % Only plot a + if there is a suitable sized binary area           
-            plot(centroids(sorted_area_row(p),1),centroids(sorted_area_row(p),2),'g+','LineWidth',1.5)
+            plot(centroids(sorted_area_row(p),1),centroids(sorted_area_row(p),2),'g+','LineWidth',2)
             cv_block_struct(1,block_struct_row) = centroids(sorted_area_row(p),1);
             cv_block_struct(2,block_struct_row) = centroids(sorted_area_row(p),2);
             cv_block_struct(3,block_struct_row) = 147.00;
@@ -203,16 +206,21 @@ end
 
 % -----------ERROR CHECKING-----------
 % Cleaning up double color localistaion errors AND outside ML results
- % Comparing all the other blocks with the first block
- % for j = 2 : size(sorted_m,1) 
- %     if (sqrt((bboxes(j,2)^2-bboxes(1,2)^2)) < 10)
- %         doubleDetect = true;
- %     find()    
- %     end
- % end            
+ %Comparing all the other blocks with the first block
+for j = 1 : size(cv_block_struct,2) 
+    for check_ctr = 1 : size(cv_block_struct,2)  
+        D = sqrt((cv_block_struct(1,j) - cv_block_struct(1,check_ctr))^2 +...
+            (cv_block_struct(2,j) - cv_block_struct(2,check_ctr))^2);
+        if (D < 10 && D > 0)
+            doubleDetect = true;            
+            cv_block_struct(1,check_ctr) = 0;
+            cv_block_struct(2,check_ctr) = 0;
+        end    
+    end
+end            
 
  % debug show the results of computer vision color/pose detection
- image_place_data = cv_block_struct; % Image coordinate frame
+image_place_data = cv_block_struct; % Image coordinate frame
 
 disp('3. DONE: Qwirkle Localisation and Color')
 
@@ -235,7 +243,7 @@ image_place_data = fix(image_place_data);
 while (pick_counter <= size(bboxes,1) && missingCentroid == false)
     % each bounding box vector from FRCNN in turn
     ROI = bboxes(pick_counter,:); 
-    while (j <= size(bboxes,1)+1)
+    while (j <= size(bboxes,1))
         % check if any of the color/centroids are in this current ROI 
         tf = isInROI(ROI,image_place_data(1,j),image_place_data(2,j));
         
@@ -243,27 +251,27 @@ while (pick_counter <= size(bboxes,1) && missingCentroid == false)
             % Store which shape
             shape_color(1,pick_counter) = labels(pick_counter);
             % Store which color (matching)
-            shape_color(2,pick_counter) = image_place_data(3,j);
+            shape_color(2,pick_counter) = image_place_data(4,j);
             pick_counter = pick_counter + 1; % fill in shape_color array
             % after each successful match
             % Break out of loop
-            plot(image_place_data(1,j),image_place_data(2,j),'r*');
+            plot(image_place_data(1,j),image_place_data(2,j),'bo','LineWidth',1.5);
             break;
         end
         
         % Error handle in case of missing centroid
         % at end of search through all existing centroids
         % assuming that bboxes were all correct/detected
-        if (j == size(bboxes,1)+1)
+        if (j == size(bboxes,1))
             % Can't find centroid
-                   
+            
             if (pick_counter < size(bboxes,1))
                 pick_counter = pick_counter + 1;
                 break;
             else
                 missingCentroid = true; % raise flag
                 break;
-            end 
+            end                         
         end
         
         % if tf is false (the current centroid is not in current ROI
@@ -280,8 +288,6 @@ for r = 1 : size(shape_color,2)
     disp(matchIntepretation);
 end
 
-% 
-
 disp('4. DONE: Matched Shape and Color ')
 
 %% ---------------------Orientation of Blocks----------------------
@@ -289,34 +295,27 @@ disp('4. DONE: Matched Shape and Color ')
 % Call function for each detected block in turn
 % 100 x 100. make image around each centroid
 
-surfMin = 130; % minimum size for SURF detector to work
-bdim = surfMin;
-offset = 10; % pixel boundary around a block
-rect_length = 65;
-%tempROI_image = zeros(size(ROI_image,1),size(ROI_image,2));
+bdim = 100;
 tempROI_image = ROI_image;
 
 for k = 1: size(image_place_data,2)
 
     hold on
     
-    % Make comparison image (for each block)
-    surf_x = image_place_data(1,k);
-    surf_y = image_place_data(2,k);
-    
-    % ROI centred on each detected block in turn
-    surf_roi = [surf_x-bdim/2,surf_y-bdim/2,bdim,bdim];
+    % Make temp comparison image (for each block)    
+    surf_roi = [image_place_data(1,k)-bdim/2,image_place_data(2,k)-bdim/2,bdim,bdim];
     aligned_block = imcrop(tempROI_image,surf_roi); % CustomerImage remains as RGB for color detection
-    
-    % Convert to grayscale
-    aligned_block = rgb2gray(aligned_block);
-    block_angle = abs(checkBlockOrientation(aligned_block));
-    
-    cv_block_struct(5,k) = block_angle;
-    
-    block_orientation = sprintf('%d',block_angle);
-    text(surf_x-10,surf_y-40,block_orientation,'FontSize',10,'Color','b')
+            
+    s15 = imrotate(s, 15);            %rotate the square 15 degrees
+    g = rgb2gray(s15);                %convert to greyscale
+    p = regionprops(l, 'Extrema'); 
+    sides = p.Extrema(4,:) - p.Extrema(6,:); % Returns the sides of the square triangle that completes the two chosen extrema: Bottom-Right and Left-Bottom
+    OrientationAngle = rad2deg(atan(-sides(2)/sides(1))) ; % Note the 'minus' sign compensates for the inverted y-values in image coordinates
 
+    %cv_block_struct(5,k) = block_angle;    
+    %block_orientation = sprintf('%d',block_angle);
+    %text(x,y,block_orientation,'FontSize',10,'Color','b')
+    
     tempROI_image = ROI_image;
 end
 
@@ -353,6 +352,7 @@ end
 world_place_data = image_place_data; % World coordinate frame (x,y,z,color)
 
 % MATLAB -> Ethernet. Send array (homogeneous transform matrix form - pose) 
+disp('Sent PLACE Coordinates to Robot Arm')
 
 disp('6. DONE: PLACE Coordinates');
 
@@ -367,6 +367,9 @@ conv_match_ctr = 1;
 correctColor = false;
 foundAllBlocks = false;
 pick_array = zeros(4,size(world_place_data,2));
+
+%conveyorTransform
+%conveyorRotation
 
 usingConveyor = false; % change if using images from file
 
@@ -480,10 +483,11 @@ while (foundAllBlocks ~= true)
                     % shape/color block
                     %[515.0,4.50,676.00,720.00]
                                         
-                    %pointsToWorld(calibrationSession.CameraParameters,...
-                    %rotationMatrix,translationVector,...
+                    %pointsToWorld(conveyorCalib,...
+                    %conveyorRotation,conveyorTransform,...
                     %[515.0+x,4.50+y]);
                     
+                    % send through ethernet (somehow...)
                     disp('Sent PICK Coordinates to Robot');                             
                     pause(0.5);
 
@@ -617,8 +621,8 @@ function [color_hsv_hi,color_hsv_low] = HSV_Iterator(counter)
     end
     if (counter == 2)
         % Threshold for HSV - GREEN
-        color_hsv_low = [0.255,0.050,0.084];
-        color_hsv_hi = [0.430,1.00,0.700];
+        color_hsv_low = [0.180,0.200,0.084];
+        color_hsv_hi = [0.330,0.700,0.600];
     end
     if (counter == 3)
         % Threshold for HSV - BLUE
@@ -627,8 +631,8 @@ function [color_hsv_hi,color_hsv_low] = HSV_Iterator(counter)
     end
     if (counter == 4)
         % Threshold for HSV - YELLOW
-        color_hsv_low = [0.10,0.135,0.152];
-        color_hsv_hi = [0.550,0.950, 0.850];
+        color_hsv_low = [0.10,0.165,0.152];
+        color_hsv_hi = [0.200,0.600, 0.850];
     end
 end
 
