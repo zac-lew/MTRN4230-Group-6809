@@ -34,6 +34,7 @@ disp('ML Qwirkle Detector Loaded!');
 %% 1. Obtain Customer Image @ Robot CEll
 
 warning('off','all');
+clc;
 close all
 
 % Testing with customer's sample image: (full resolution of 1600 x 1200)
@@ -293,28 +294,26 @@ disp('4. DONE: Matched Shape and Color ')
 %% ---------------------Orientation of Blocks----------------------
 % Image processing to determine orientation of blocks
 % Call function for each detected block in turn
-% 100 x 100. make image around each centroid
 
-bdim = 100;
+bdim = 50;
 tempROI_image = ROI_image;
-
 for k = 1: size(image_place_data,2)
 
     hold on
     
     % Make temp comparison image (for each block)    
-    surf_roi = [image_place_data(1,k)-bdim/2,image_place_data(2,k)-bdim/2,bdim,bdim];
-    aligned_block = imcrop(tempROI_image,surf_roi); % CustomerImage remains as RGB for color detection
+    angle_roi = [image_place_data(1,k)-bdim/2,image_place_data(2,k)-bdim/2,bdim,bdim];
+    aligned_block = imcrop(tempROI_image,angle_roi); % CustomerImage remains as RGB for color detection
             
-    s15 = imrotate(s, 15);            %rotate the square 15 degrees
-    g = rgb2gray(s15);                %convert to greyscale
-    p = regionprops(l, 'Extrema'); 
-    sides = p.Extrema(4,:) - p.Extrema(6,:); % Returns the sides of the square triangle that completes the two chosen extrema: Bottom-Right and Left-Bottom
-    OrientationAngle = rad2deg(atan(-sides(2)/sides(1))) ; % Note the 'minus' sign compensates for the inverted y-values in image coordinates
+    %convert to greyscale
+    g = rgb2gray(aligned_block);              
+    p = regionprops(g, 'Extrema'); 
+    sides = p(1).Extrema(4,:) - p(1).Extrema(6,:); % Returns the sides of the square triangle that completes the two chosen extrema: Bottom-Right and Left-Bottom
+    block_angle = rad2deg(atan(-sides(2)/sides(1)));  % Note the 'minus' sign compensates for the inverted y-values in image coordinates
 
-    %cv_block_struct(5,k) = block_angle;    
-    %block_orientation = sprintf('%d',block_angle);
-    %text(x,y,block_orientation,'FontSize',10,'Color','b')
+    image_place_data(5,k) = fix(round(block_angle));
+    block_orientation = sprintf('Angle %.2f',block_angle);
+    text(image_place_data(1,k),image_place_data(2,k)-50,block_orientation,'FontSize',12,'Color','b')
     
     tempROI_image = ROI_image;
 end
