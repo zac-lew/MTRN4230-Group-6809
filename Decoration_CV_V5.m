@@ -13,6 +13,8 @@
 %            color logic.
 % v9. 14/8/19 Tested getting live feed from both cameras. Finetuned ML
 %             detection and conveyor processing per frame
+% v10. 18/8/19 Fixed up orientation code. Conveyor code error handling
+%               and detection over multiple frames
 % ----------------ChangeLog---------------
 
 % Computer Vision Engineer (Decoration)
@@ -37,15 +39,19 @@ warning('off','all');
 clc;
 close all
 
-% Testing with customer's sample image: (full resolution of 1600 x 1200)
-customerImage = imread('.\YOLO_TEST\Test13.jpg'); 
-figure
-imshow(customerImage);
+useRobotCellCamera = false;
 
-%(USE ROBOT CELL CAMERA - WORKS)
-%customerImage = MTRN4230_Image_Capture([]); %for robot cell
-%figure
-%imshow(customerImage);
+if (~useRobotCellCamera)
+    disp('---USING ROBOT CELL CAMERA---');      
+    customerImage = imread('.\YOLO_TEST\Test1.jpg'); 
+    figure
+    imshow(customerImage);
+else
+    disp('---USING ROBOT CELL CAMERA---');      
+    customerImage = MTRN4230_Image_Capture([]); %for robot cell
+    figure
+    imshow(customerImage);
+end
 
 % Intial image processing before the FRCNN Detector
 
@@ -69,14 +75,14 @@ figure
 imshow(ROI_image)
 hold on
 
-disp('1. Customer Image Obtained')
+disp('[.1.] Customer Image Obtained')
 
 %% 2. Detect Quirkle Blocks from Sample Image (Classification + Localisation)
 %% ------------------------RUN ML MODEL ON CUSTOMER IMAGE--------------------
 
 % Input image must be greater than [224 224]
 % Run the Qwirkle detector on customer's image
-ML_threshold = 0.29;
+ML_threshold = 0.35;
 [bboxes,scores,labels] = detect(detector_updated_final,highlighted_blocks_c,'Threshold',ML_threshold,'NumStrongestRegions',10);
 % Clean up ML results if double-detections/false positives
 [sorted_m sorted_i] = sort(scores,'descend');
@@ -103,7 +109,7 @@ for j = 1 : size(bboxes,1)
     text(bboxes(j,1)-10,bboxes(j,2)-25,{[ML_1];[ML_2]},'FontSize',10,'Color','r','FontWeight','bold')
 end
 
-disp('2. DONE: Ran F-RCNN Qwirkle Block Detector on Image')
+disp('[.2.] DONE: Ran F-RCNN Qwirkle Block Detector on Image')
 
 % Now have bounding boxes, scores and labels
 
@@ -223,7 +229,7 @@ end
  % debug show the results of computer vision color/pose detection
 image_place_data = cv_block_struct; % Image coordinate frame
 
-disp('3. DONE: Qwirkle Localisation and Color')
+disp('[.3.] DONE: Qwirkle Localisation and Color')
 
 %% ---------------------Match Shape with Color----------------------
 
@@ -289,7 +295,7 @@ for r = 1 : size(shape_color,2)
     disp(matchIntepretation);
 end
 
-disp('4. DONE: Matched Shape and Color ')
+disp('[.4.] DONE: Matched Shape and Color ')
 
 %% ---------------------Orientation of Blocks----------------------
 % Image processing to determine orientation of blocks
@@ -323,7 +329,7 @@ hold off
 
 % Desired pose Here
 
-disp('5. DONE: Block Orientation');
+disp('[.5.] DONE: Block Orientation');
 
 %% ---------------------Place Coordinates----------------------
 % Applied to whole image struct (after it has been filled)
@@ -354,10 +360,11 @@ world_place_data = image_place_data; % World coordinate frame (x,y,z,color)
 % MATLAB -> Ethernet. Send array (homogeneous transform matrix form - pose) 
 
 robot_place = [world_place_data(1,:) ; world_place_data(2,:) ; world_place_data(5,:)];
+% might want all place for each block in one row
 
 disp('Sent PLACE Coordinates to Robot Arm')
 
-disp('6. DONE: PLACE Coordinates');
+disp('[.6.] DONE: PLACE Coordinates');
 
 %% 4a. Detect on Conveyor Belt (Simulated Conveyor or Real Conveyor)
 % For each Block:
@@ -375,24 +382,28 @@ checkMatch = false;
 %conveyorTransform
 %conveyorRotation
 
-usingConveyor = true; % change if using images from file
+% store world X, world Y, angle (at conveyor) for each block (in turn)
+pick_robot = zeros(1,3);
+
+usingConveyor = false;
 runOnce = false;
-%[[LABELS: Circle,Clover,CrissCross,Diamond,Square,Starburst]]
+
+disp('---USING CONVEYOR CAMERA---');      
 
 while (foundAllBlocks ~= true && runOnce == false)
     
     runOnce = true;
     
-    for conveyorImage = 1:length(list)-44
+    for conveyorImage = 1:length(list)
         
         if (~usingConveyor)
             imagePath = fullfile(list(conveyorImage).folder,list(conveyorImage).name);
             cImage = imread(imagePath);        
         else
             % Change to conveyor camera
-            %cImage = MTRN4230_Image_Capture([],[]); %for conveyor camera (get one frame)
-            % Load camera calibration .mat file
-            cImage = imread('.\YOLO_TEST\ConveyorImages\C43.jpg');
+            cImage = MTRN4230_Image_Capture([],[]); %for conveyor camera (get one frame)
+            %Load camera calibration .mat file
+            %cImage = imread('.\YOLO_TEST\ConveyorImages\C43.jpg');
 
         end
         
@@ -505,37 +516,45 @@ while (foundAllBlocks ~= true && runOnce == false)
 
                     pause(0.5);
 
-                    % Further analysis  
+                    % Further analysis (Angle + Send) 
                     if (correctColor == true)
-                  
+                        tempROI_imageC = cImage;
                         Qwirkle_Con_Match = sprintf('%d: %s %s FOUND',conv_match_ctr,whatColor(shape_color(2,j)),cLabels(id));
                         disp(Qwirkle_Con_Match);
                                                                        
                         % 3. Detected pose (match to customer's desired pose)
-                        %checkBlockOrientation(aligned_block);
-                        disp('Detected Orientation of a Desired Block');         
-                        pause(0.5);
+                            angle_roiC = [tempX-bdim/2,tempY-bdim/2,bdim,bdim];
+                            aligned_block = imcrop(tempROI_imageC,angle_roiC); % CustomerImage remains as RGB for color detection
+
+                            % Call function to detect orientation
+                            block_angleC = checkBlockOrientation(aligned_block);
+                            disp('Detected Orientation of a Desired Block');         
+                            pause(0.5);
 
                         % 4. Send PICK Data to Robot Arm for the designated
-                        % shape/color block
-                        %[515.0,4.50,676.00,720.00]
+                            % shape/color block
+                            %[515.0,4.50,676.00,720.00]
 
-                        %pointsToWorld(conveyorCalib,...
-                        %conveyorRotation,conveyorTransform,...
-                        %[515.0+tempX,4.50+tempY]);
+                            %robot_pick(1,1:2) = pointsToWorld(conveyorCalib,...
+                            %conveyorRotation,conveyorTransform,...
+                            %[515.0+tempX,4.50+tempY]);
 
-                        % send through ethernet (somehow...)
-                        disp('Sent PICK Coordinates to Robot');                             
-                        pause(0.5);    
-                        tempCtr = 0;
+                            % send through ethernet (somehow...)
+                            robot_pick(1,3) = block_angleC;                            
+                            pick_command = sprintf('Sent PICK coordinates for block %d'...
+                                ,conv_match_ctr);
+                            disp(pick_command);                             
+                            pause(1.0);    
+                            tempCtr = 0;
                         
                         % If all required blocks are found
                         % TODO: factor in the missing centroids
                         if (conv_match_ctr == size(shape_color,2))
                             foundAllBlocks = true;
-                            completed_decoration = sprintf('ALL %d BLOCKS FOUND AND PLACED ON CAKE'...
+                            completed_decoration = sprintf('~~~ALL %d BLOCKS FOUND AND PLACED ON CAKE~~'...
                                 ,conv_match_ctr);
                             disp(completed_decoration);
+                            pause(2);
                             break;
                         else
                             conv_match_ctr = conv_match_ctr + 1; % max number of blocks
@@ -560,6 +579,10 @@ while (foundAllBlocks ~= true && runOnce == false)
                 end    
                 % else continue to scan live feed
                 % for next desired shape from customer
+                disp('');
+                disp('~~LOOKING FOR NEXT BLOCK FROM CUSTOMER ORDER~~');         
+                disp('');
+
                 break;
             end
         end
@@ -568,7 +591,7 @@ while (foundAllBlocks ~= true && runOnce == false)
     end    
 end
 
-disp('7. TESTING: Detected the Customer Shapes on Conveyor');
+disp('[.7.] TESTING: Detected the Customer Shapes on Conveyor');
 
 %% FUNCTIONS
 
