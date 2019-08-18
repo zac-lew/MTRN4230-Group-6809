@@ -1,0 +1,170 @@
+MODULE MattMove
+	! Test code for picking and placing objects
+	! Also includes some helper functions and an example of how to do user input.
+    
+    PERS jointtarget jCur;
+    PERS robtarget   pCur;
+    CONST num zTab := 147;
+    CONST num zCon := 22.1;
+        
+    !VAR num i := 1;
+    VAR num aPnP{2,5}:=[[-100,300,550,0,45],[100,350,450,0,30]];
+        
+    VAR num xi1 := -100;
+    VAR num yi1 := 300;
+    VAR num xf1 := 500;
+    VAR num yf1 := 0;
+    VAR num ang1 := 45;
+    
+    VAR robtarget pA := [[-100,300,zCon],[0,0,-1,0],[0,0,0,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
+    VAR robtarget pB := [[500,0,zTab],[0,0,-1,0],[0,0,0,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
+    
+    CONST robtarget pZeros := [[0,0,0],[0,0,-1,0],[0,0,0,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
+    VAR pos xyzZeros := [0,0,0];
+    
+    VAR num userIn := -10;
+    VAR num ang := 180;
+    
+    PROC Main()
+        TPWrite "-------------- Start";  
+        MoveToCalibPos;
+        PrintCurPose;
+        MattTurnVacOff;
+        
+        !TPReadNum userIn, "What j1 do you want?";
+        !MoveToPose userIn, 10, -10, 0, 0, 0;
+        
+        userIn := Cos(userIn*0.1);
+        
+        jCur := CJointT();
+        pCur := CRobT(\Tool:=tSCup);   
+        !PrintPose pCur;
+        !PrintJoint jCur;
+        
+        !PickNPlace pA, pB, 45;
+        !PickNPlaceXYA xi1, yi1, xf1, yf1, ang1;
+        FOR i FROM 1 TO Dim(aPnP,1) DO
+            PickNPlaceXYA aPnP{i,1}, aPnP{i,2}, aPnP{i,3}, aPnP{i,4}, aPnP{i,5};
+        ENDFOR
+        
+        MoveToCalibPos;
+        
+        TPWrite "-------------- Done";
+        
+    ENDPROC
+
+    
+    PROC PickNPlace(robtarget pPick, robtarget pPlace, num angle)     
+        VAR num upOff := 30;        
+        TPWrite "Starting PNP";
+        
+        ! Move just above the object
+        MoveJ Offs(pPick,0,0,upOff), v100, fine, tSCup;
+        MattTurnVacOn;
+        TPWrite "Vac on";       
+        MoveL pPick, v20, fine, tSCup;
+        MoveL Offs(pPick,0,0,200), v50, fine, tSCup;
+        
+        ! Move just above the target place
+        ! Angle anticlockwise
+        pPlace.rot := OrientZYX(180 + angle, 0, 180);
+        MoveJ Offs(pPlace,0,0,upOff), v100, fine, tSCup;
+        MoveL pPlace, v20, fine, tSCup;
+        MattTurnVacOff;
+        TPWrite "Vac off";  
+        MoveJ Offs(pPlace,0,0, 100), v100, fine, tSCup;
+    ENDPROC
+    
+    PROC PickNPlaceXYA(num xi, num yi, num xf, num yf, num angle)
+        VAR robtarget pPick := pZeros;
+        VAR robtarget pPlace := pZeros;       
+        VAR num upOff := 30;
+        pPick.trans := [xi,yi,zCon];
+        pPlace.trans := [xf,yf,zTab];
+        pPlace.rot := OrientZYX(180 + angle,0,180);               
+        
+        TPWrite "Starting PNP xya";
+        PrintPose(pPick);
+        PrintPose(pPlace);
+        
+        ! Move just above the object
+        MoveJ Offs(pPick,0,0,upOff), v100, fine, tSCup;
+        MattTurnVacOn;
+        TPWrite "Vac on";       
+        MoveL pPick, v20, fine, tSCup;
+        MoveL Offs(pPick,0,0,200), v50, fine, tSCup;
+        
+        ! Move just above the target place
+        ! Angle anticlockwise
+        MoveJ Offs(pPlace,0,0,upOff), v100, fine, tSCup;
+        MoveL pPlace, v20, fine, tSCup;
+        MattTurnVacOff;
+        TPWrite "Vac off";  
+        MoveJ Offs(pPlace,0,0, 100), v100, fine, tSCup;
+    ENDPROC
+    
+    PROC PrintCurPose()
+        PrintPose CRobT(\Tool:=tSCup);
+    ENDPROC
+    
+    PROC PrintCurJoint()
+        PrintJoint CJointT();
+    ENDPROC
+    
+    PROC MattTurnVacOn()
+        
+        ! Set VacRun on.
+        SetDO DO10_1, 1;
+        SetDO DO10_2, 1;
+        
+    ENDPROC
+    
+    PROC MattTurnVacOff()
+        
+        ! Set VacRun off.
+        SetDO DO10_2, 0;
+        SetDO DO10_1, 0;
+        
+    ENDPROC
+    
+    PROC MattTurnConOnSafely()
+        
+        ! An example of how an IF statement is structured.
+        ! DI10_1 is 'ConStat', and will only be equal to 1 if the conveyor is on and ready to run.
+        ! If it is ready to run, we will run it, if not, we will set it off so that we can fix it.
+        IF DI10_1 = 1 THEN
+            SetDO DO10_3, 1;
+        ELSE
+            SetDO DO10_3, 0;
+        ENDIF
+        
+    ENDPROC
+    
+    PROC MattTurnConOff()
+        SetDO DO10_3, 0;
+    ENDPROC
+    
+    PROC PrintPose(robtarget P)
+        TPWrite "x: " + NumToStr(P.trans.x,2) +
+                " y: " + NumToStr(P.trans.y,2) +
+                " z: " + NumToStr(P.trans.z,2) +
+                " Q: " + NumToStr(P.rot.q1,3) +
+                ", " + NumToStr(P.rot.q2,3) +
+                ", " + NumToStr(P.rot.q3,3) +
+                ", " + NumToStr(P.rot.q4,3);         
+    ENDPROC
+    
+    PROC PrintJoint(jointtarget J)
+        TPWrite "Joints = "  + NumToStr(J.robax.rax_1, 3) +
+                ", " + NumToStr(J.robax.rax_2, 3) +
+                ", " + NumToStr(J.robax.rax_3, 3) +
+                ", " + NumToStr(J.robax.rax_4, 3) +
+                ", " + NumToStr(J.robax.rax_5, 3) +
+                ", " + NumToStr(J.robax.rax_6, 3);
+    ENDPROC
+    
+    PROC MoveToPose(num Theta1, num Theta2, num Theta3, num Theta4, num Theta5, num Theta6)
+        MoveAbsJ [[Theta1, Theta2, Theta3, Theta4, Theta5, Theta6],[9E+9,9E+9,9E+9,9E+9,9E+9,9E+9]], v100, fine, tSCup;
+    ENDPROC
+   
+ENDMODULE
