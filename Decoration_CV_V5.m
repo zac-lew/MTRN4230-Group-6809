@@ -301,18 +301,19 @@ for k = 1: size(image_place_data,2)
 
     hold on
     
+    if (image_place_data(1,k) == 0 || image_place_data(2,k) == 0)
+        continue;
+    end
+    
     % Make temp comparison image (for each block)    
     angle_roi = [image_place_data(1,k)-bdim/2,image_place_data(2,k)-bdim/2,bdim,bdim];
     aligned_block = imcrop(tempROI_image,angle_roi); % CustomerImage remains as RGB for color detection
             
-    %convert to greyscale
-    g = rgb2gray(aligned_block);              
-    p = regionprops(g, 'Extrema'); 
-    sides = p(1).Extrema(4,:) - p(1).Extrema(6,:); % Returns the sides of the square triangle that completes the two chosen extrema: Bottom-Right and Left-Bottom
-    block_angle = rad2deg(atan(-sides(2)/sides(1)));  % Note the 'minus' sign compensates for the inverted y-values in image coordinates
+    % Call function to detect orientation
+    block_angle = checkBlockOrientation(aligned_block);
 
-    image_place_data(5,k) = fix(round(block_angle));
-    block_orientation = sprintf('Angle %.2f',block_angle);
+    image_place_data(5,k) = (round(block_angle));
+    block_orientation = sprintf('%.2f',block_angle);
     text(image_place_data(1,k),image_place_data(2,k)-50,block_orientation,'FontSize',12,'Color','b')
     
     tempROI_image = ROI_image;
@@ -387,10 +388,10 @@ while (foundAllBlocks ~= true)
             % Load camera calibration .mat file
         end
         
-    figure
-    cImage = imcrop(cImage,[515.0,4.50,676.00,720.00]);
-    imshow(cImage);
-    hold on;
+        figure
+        cImage = imcrop(cImage,[515.0,4.50,676.00,720.00]);
+        imshow(cImage);
+        hold on;
 
         [cBboxes,cScores,cLabels] = detect(detector_updated_final,cImage,'Threshold',0.20,...
              'NumStrongestRegions',15);
@@ -407,8 +408,8 @@ while (foundAllBlocks ~= true)
 
             while (correctShape == false)        
 
-                % Look for current shape_color pair in current frame from Conveyor
-
+                % Look for current shape_color pair in current frame from Conveyor               
+               
                 % Skip if missing a shape from color/shape match
                 if (shape_color(1,j) == 0)
                     break;
@@ -422,6 +423,7 @@ while (foundAllBlocks ~= true)
                 [check,id] = shapeCheck(uint8(cLabels),shape_color(1,j));
                 % true = looking through all detected labels,
                 % if one of the labels = the current shape from customer image
+                
                 if (check == true)
 
                     correctShape = true; % if current shape from shape_col match array is detected
@@ -440,20 +442,65 @@ while (foundAllBlocks ~= true)
 
                     % For the located shape:
                     % 2. Check if the matched shape is in right color
-                    disp('Check if Correct Color');
-                    % run HSV check @ conveyor    
-                    if (true)
+                    % Have BB for shape. Check if centroid is in bbox
+                  
+                    for color_i = 1 : 4
+                    
+                        hsv_pathC = rgb2hsv(cImage);
+                        % Create mask to find pixels with desired HSV ranges (binary mask) -
+                        % Current iterated HSV filter    
+                        [color_hsv_hi,color_hsv_low] = HSV_Iterator(color_i);                        
+
+                        mask_desiredC = (hsv_pathC(:,:,1) >= color_hsv_low(1)) & (hsv_pathC(:,:,1) <= color_hsv_hi(1)) & ...
+                                (hsv_pathC(:,:,2) >= color_hsv_low(2) ) & (hsv_pathC(:,:,2) <= color_hsv_hi(2)) & ...
+                                (hsv_pathC(:,:,3) >= color_hsv_low(3) ) & (hsv_pathC(:,:,3) <= color_hsv_hi(3));
+                    
+                        statsC = regionprops(mask_desiredC,'basic');
+                        Ccentroids = cat(1,statsC.Centroid);                        
+                        [sort_area_mC,sorted_area_rowC] = sort(statsC,'descend'); 
+
+                        % check labels detected at conveyor    
+                        % ROI. bbox of detected shape (known)
+                        % x,y = centroids found from each HSV filter
+                        for ctr = 1 : size(shape_color,2)
+                            checkMatch = isInROI(bboxes(id,:),Ccentroids(sorted_area_rowC(ctr),1),...
+                                Ccentroids(sorted_area_rowC(ctr),2));                                            
+                        end                        
+                    end
+                    
+                    if (checkMatch == true)
                         % if yes -> correctColor = true;
                         correctColor = true;
-                    end
-                                    
-                    %else correctColor = false               
-                    %pause(0.5);
+                        disp('Correct Color');
+                    else
+                        correctColor = false;
+                        disp('Incorrect Color');
+                    end                                
+
+                    pause(0.5);
 
                     if (correctColor == true)
+                  
                         Qwirkle_Con_Match = sprintf('%d: %s %s FOUND',conv_match_ctr,whatColor(shape_color(2,j)),cLabels(id));
                         disp(Qwirkle_Con_Match);
+                                                                       
+                        % 3. Detected pose (match to customer's desired pose)
+                        %checkBlockOrientation(aligned_block);
+                        disp('Detected Orientation of a Desired Block');         
+                        pause(0.5);
 
+                        % 4. Send PICK Data to Robot Arm for the designated
+                        % shape/color block
+                        %[515.0,4.50,676.00,720.00]
+
+                        %pointsToWorld(conveyorCalib,...
+                        %conveyorRotation,conveyorTransform,...
+                        %[515.0+x,4.50+y]);
+
+                        % send through ethernet (somehow...)
+                        disp('Sent PICK Coordinates to Robot');                             
+                        pause(0.5);                                              
+                        
                         % If all required blocks are found
                         % TODO: factor in the missing centroids
                         if (conv_match_ctr == size(shape_color,2))
@@ -462,40 +509,26 @@ while (foundAllBlocks ~= true)
                                 ,conv_match_ctr);
                             disp(completed_decoration);
                             break;
+                        else
+                            conv_match_ctr = conv_match_ctr + 1; % max number of blocks
+                            % to scan for overall
+                            correctColor = false; % reset flag                        
                         end
-                        %else continue to scan for blocks
-                        conv_match_ctr = conv_match_ctr + 1; % max number of blocks to scan for overall
-                        correctColor = false; % reset flag
-                    % 3. If NOT, see if there were any other detected objects
-                    % with the same shape and check their color                                
-                    elseif (conv_match_ctr < size(shape_color,2) && correctShape == true)
-                        disp('Checking Similar Shapes');
+                   
+                        % If a block and color is successfully found, remove this
+                        % from the array so the conveyor does not look for it again
+                        shape_color(1,j) = -1;                                
+                        check = false; % reset current T/F detection
+                        correctShape = false;
+                    else
+                        
+                        % If NOT, see if there were any other detected objects
+                        % with the same shape and check their color                                
+                        %(conv_match_ctr < size(shape_color,2) && correctShape == true)
+                        disp('Checking Similar Shapes?');
                         % check duplicates over array
-                    end
-                    pause(0.5);
-
-                    % 4. Detected pose (match to customer's desired pose)
-                    disp('Detected Orientation of a Desired Block');         
-                    pause(0.5);
-
-                    % 5. Send PICK Data to Robot Arm for the designated
-                    % shape/color block
-                    %[515.0,4.50,676.00,720.00]
-                                        
-                    %pointsToWorld(conveyorCalib,...
-                    %conveyorRotation,conveyorTransform,...
-                    %[515.0+x,4.50+y]);
-                    
-                    % send through ethernet (somehow...)
-                    disp('Sent PICK Coordinates to Robot');                             
-                    pause(0.5);
-
-                    % If a block and color is successfully found, remove this
-                    % from the array so the conveyor does not look for it again
-                    shape_color(1,j) = -1;                                
-                    check = false; % reset current T/F detection
-                    correctShape = false;
-                    break;
+                    end                    
+                
                 end    
                 % else continue to scan live feed
                 % for next desired shape from customer
@@ -582,33 +615,11 @@ end
 
 function block_angle = checkBlockOrientation(block_image)
 
-    % SURF descriptors = encoder vector which shows regions where the image
-    % is not affected by brightness, scale or rotation
-    surf_points = detectSURFFeatures(block_image);    
-    block_original = imread('block_0_pos.jpg'); % constant reference
-    block_original = rgb2gray(block_original);
-
-    % detect SURF Features (as many blobs as possible)
-    ptsOriginal  = detectSURFFeatures(block_original,'MetricThreshold',25);
-    ptsDistorted = detectSURFFeatures(block_image,'MetricThreshold',25);
-
-    % Extract feature descriptors
-    [featuresOriginal,  validPtsOriginal]  = extractFeatures(block_original, ptsOriginal);
-    [featuresDistorted, validPtsDistorted] = extractFeatures(block_image, ptsDistorted);
-
-    % Match features
-    indexPairs = matchFeatures(featuresOriginal, featuresDistorted);
-    matchedOriginal = validPtsOriginal(indexPairs(:,1));
-    matchedDistorted = validPtsDistorted(indexPairs(:,2));
-
-    % Calculate Orientation
-    [tform,~,~] = estimateGeometricTransform(...
-        matchedDistorted, matchedOriginal, 'similarity');
-
-    Tinv  = tform.invert.T;
-    ss = Tinv(2,1);
-    sc = Tinv(1,1);
-    block_angle = round(atan2(ss,sc)*180/pi);            
+    %convert to greyscale
+    g = rgb2gray(block_image);              
+    p = regionprops(g, 'Extrema'); 
+    sides = p(1).Extrema(4,:) - p(1).Extrema(6,:); % Returns the sides of the square triangle that completes the two chosen extrema: Bottom-Right and Left-Bottom
+    block_angle = rad2deg(atan(-sides(2)/sides(1)));  % Note the 'minus' sign compensates for the inverted y-values in image coordinates    
     
 end
 
