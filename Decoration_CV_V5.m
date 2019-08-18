@@ -352,6 +352,9 @@ end
 world_place_data = image_place_data; % World coordinate frame (x,y,z,color)
 
 % MATLAB -> Ethernet. Send array (homogeneous transform matrix form - pose) 
+
+robot_place = [world_place_data(1,:) ; world_place_data(2,:) ; world_place_data(5,:)];
+
 disp('Sent PLACE Coordinates to Robot Arm')
 
 disp('6. DONE: PLACE Coordinates');
@@ -367,25 +370,30 @@ conv_match_ctr = 1;
 correctColor = false;
 foundAllBlocks = false;
 pick_array = zeros(4,size(world_place_data,2));
+checkMatch = false;
 
 %conveyorTransform
 %conveyorRotation
 
-usingConveyor = false; % change if using images from file
-
+usingConveyor = true; % change if using images from file
+runOnce = false;
 %[[LABELS: Circle,Clover,CrissCross,Diamond,Square,Starburst]]
 
-while (foundAllBlocks ~= true)
-   
-    for conveyorImage = 1:length(list)-42
+while (foundAllBlocks ~= true && runOnce == false)
+    
+    runOnce = true;
+    
+    for conveyorImage = 1:length(list)-44
         
         if (~usingConveyor)
             imagePath = fullfile(list(conveyorImage).folder,list(conveyorImage).name);
             cImage = imread(imagePath);        
         else
             % Change to conveyor camera
-            cImage = MTRN4230_Image_Capture([],[]); %for conveyor camera (get one frame)
+            %cImage = MTRN4230_Image_Capture([],[]); %for conveyor camera (get one frame)
             % Load camera calibration .mat file
+            cImage = imread('.\YOLO_TEST\ConveyorImages\C43.jpg');
+
         end
         
         figure
@@ -443,42 +451,61 @@ while (foundAllBlocks ~= true)
                     % For the located shape:
                     % 2. Check if the matched shape is in right color
                     % Have BB for shape. Check if centroid is in bbox
-                  
-                    for color_i = 1 : 4
+                    tempCtr = 0; % for each detected block (flag)
                     
-                        hsv_pathC = rgb2hsv(cImage);
-                        % Create mask to find pixels with desired HSV ranges (binary mask) -
-                        % Current iterated HSV filter    
-                        [color_hsv_hi,color_hsv_low] = HSV_Iterator(color_i);                        
+                    hsv_pathC = rgb2hsv(cImage);
+                        
+                    % Create mask to find pixels with desired HSV ranges (binary mask) -
+                    % from customer image results
+                    csv_encoding = shape_color(2,j);
+                    [color_hsv_hi,color_hsv_low] = HSV_IteratorC(csv_encoding);               
 
-                        mask_desiredC = (hsv_pathC(:,:,1) >= color_hsv_low(1)) & (hsv_pathC(:,:,1) <= color_hsv_hi(1)) & ...
-                                (hsv_pathC(:,:,2) >= color_hsv_low(2) ) & (hsv_pathC(:,:,2) <= color_hsv_hi(2)) & ...
-                                (hsv_pathC(:,:,3) >= color_hsv_low(3) ) & (hsv_pathC(:,:,3) <= color_hsv_hi(3));
-                    
-                        statsC = regionprops(mask_desiredC,'basic');
-                        Ccentroids = cat(1,statsC.Centroid);                        
-                        [sort_area_mC,sorted_area_rowC] = sort(statsC,'descend'); 
+                    mask_desiredC = (hsv_pathC(:,:,1) >= color_hsv_low(1)) & (hsv_pathC(:,:,1) <= color_hsv_hi(1)) & ...
+                            (hsv_pathC(:,:,2) >= color_hsv_low(2) ) & (hsv_pathC(:,:,2) <= color_hsv_hi(2)) & ...
+                            (hsv_pathC(:,:,3) >= color_hsv_low(3) ) & (hsv_pathC(:,:,3) <= color_hsv_hi(3));
 
-                        % check labels detected at conveyor    
-                        % ROI. bbox of detected shape (known)
-                        % x,y = centroids found from each HSV filter
-                        for ctr = 1 : size(shape_color,2)
-                            checkMatch = isInROI(bboxes(id,:),Ccentroids(sorted_area_rowC(ctr),1),...
-                                Ccentroids(sorted_area_rowC(ctr),2));                                            
-                        end                        
+                    statsC = regionprops(mask_desiredC,'basic');
+                    Ccentroids = cat(1,statsC.Centroid);
+                    Careas = cat(1,statsC.Area); %(suitable area > 150)
+                    [sort_area_mC,sorted_area_rowC] = sort(Careas,'descend'); 
+                        
+                    if (size(sorted_area_rowC,1) < 2)
+                        continue;
+                    end
+
+                    % check labels detected at conveyor    
+                    % ROI. bbox of detected shape (known)
+                    % x,y = centroids found from the HSV filter
+                    colFound = false;
+                    for ctr = 1 : size(shape_color,2)
+                        checkMatch = isInROI(cBboxes(id,:),Ccentroids(sorted_area_rowC(ctr),1),...
+                            Ccentroids(sorted_area_rowC(ctr),2));
+                        if (checkMatch == true && colFound == false)
+                            %which color was in BBox of correct shape
+                            colFound = true; % one pass?
+                            tempCtr = checkMatch; 
+                            tempX = Ccentroids(sorted_area_rowC(ctr),1);
+                            tempY = Ccentroids(sorted_area_rowC(ctr),2);
+                        end
                     end
                     
-                    if (checkMatch == true)
+                    % scan over largest centroids in matching color
+                    if (tempCtr == true) 
                         % if yes -> correctColor = true;
                         correctColor = true;
-                        disp('Correct Color');
+                        plot(tempX,tempY,'g*','LineWidth',2);
+                        disp('Correct Color AND Correct Shape!');
+                        checkMatch = false; % reset
+                        csv_encoding = 0; % reset csv encoding for next
+                        % shape detection
                     else
                         correctColor = false;
-                        disp('Incorrect Color');
+                        disp('Incorrect Color BUT Correct Shape!');
                     end                                
 
                     pause(0.5);
 
+                    % Further analysis  
                     if (correctColor == true)
                   
                         Qwirkle_Con_Match = sprintf('%d: %s %s FOUND',conv_match_ctr,whatColor(shape_color(2,j)),cLabels(id));
@@ -495,11 +522,12 @@ while (foundAllBlocks ~= true)
 
                         %pointsToWorld(conveyorCalib,...
                         %conveyorRotation,conveyorTransform,...
-                        %[515.0+x,4.50+y]);
+                        %[515.0+tempX,4.50+tempY]);
 
                         % send through ethernet (somehow...)
                         disp('Sent PICK Coordinates to Robot');                             
-                        pause(0.5);                                              
+                        pause(0.5);    
+                        tempCtr = 0;
                         
                         % If all required blocks are found
                         % TODO: factor in the missing centroids
@@ -601,9 +629,9 @@ function colorName = whatColor(match_col)
 end
 
 function checkMatch = isInROI(ROI,x,y)
-
+   
     checkMatch = false;
-    
+
     %ROI is (x,y,x_length,y_length)
     if ((x > ROI(1) && x < ROI(1) + ROI(3)) && (y > ROI(2) && y < ROI(2) + ROI(4)))
         checkMatch = true;
@@ -623,6 +651,31 @@ function block_angle = checkBlockOrientation(block_image)
     
 end
 
+% HSV at Conveyor
+function [color_hsv_hi,color_hsv_low] = HSV_IteratorC(counter)
+    if (counter == 1)
+        % Threshold for HSV - RED
+        color_hsv_low = [0.90,0.405,0.100];
+        color_hsv_hi = [0.980,1.00,0.900];
+    end
+    if (counter == 2)
+        % Threshold for HSV - GREEN
+        color_hsv_low = [0.180,0.300,0.010];
+        color_hsv_hi = [0.430,0.700,0.620];
+    end
+    if (counter == 3)
+        % Threshold for HSV - BLUE
+        color_hsv_low = [0.542,0.290,0.00];
+        color_hsv_hi = [0.701,1.00,0.807];        
+    end
+    if (counter == 4)
+        % Threshold for HSV - YELLOW
+        color_hsv_low = [0.10,0.500,0.152];
+        color_hsv_hi = [0.230,0.800, 0.850];
+    end
+end
+
+% HSV at Robot Cell
 function [color_hsv_hi,color_hsv_low] = HSV_Iterator(counter)
     if (counter == 1)
         % Threshold for HSV - RED
