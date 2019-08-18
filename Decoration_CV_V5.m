@@ -366,7 +366,7 @@ disp('Sent PLACE Coordinates to Robot Arm')
 
 disp('[.6.] DONE: PLACE Coordinates');
 
-%% 4a. Detect on Conveyor Belt (Simulated Conveyor or Real Conveyor)
+%% Detect on Conveyor Belt (Simulated Conveyor or Real Conveyor)
 % For each Block:
 % [X,Y] PICK COORDINATES (WORLD frame)
 
@@ -389,12 +389,12 @@ usingConveyor = false;
 runOnce = false;
 
 disp('---USING CONVEYOR CAMERA---');      
-
+figure
 while (foundAllBlocks ~= true && runOnce == false)
     
     runOnce = true;
     
-    for conveyorImage = 1:length(list)
+    for conveyorImage = 1:length(list) - 15
         
         if (~usingConveyor)
             imagePath = fullfile(list(conveyorImage).folder,list(conveyorImage).name);
@@ -407,20 +407,17 @@ while (foundAllBlocks ~= true && runOnce == false)
 
         end
         
-        figure
         cImage = imcrop(cImage,[515.0,4.50,676.00,720.00]);
         imshow(cImage);
-        hold on;
 
-        [cBboxes,cScores,cLabels] = detect(detector_updated_final,cImage,'Threshold',0.20,...
-             'NumStrongestRegions',15);
+        [cBboxes,cScores,cLabels] = detect(detector_updated_final,cImage,'Threshold',0.30,...
+             'NumStrongestRegions',10);
 
          % analysing current frame
-        for j = 1 : size(shape_color,2) % for each desired shape
+         % for each desired shape in order of detection from customer image
 
-            % looking at each shape that is in list  
-            % in sequential order (until detected live on conveyor)
-
+         %for j = 1 : size(shape_color,2) 
+           
             % Looking through shape_col array for current frame
             % 1. Wait for detection of each Shape
             % 2. Check if right color
@@ -430,21 +427,32 @@ while (foundAllBlocks ~= true && runOnce == false)
                 % Look for current shape_color pair in current frame from Conveyor               
                
                 % Skip if missing a shape from color/shape match
-                if (shape_color(1,j) == 0)
-                    break;
-                end
+                % (sequential scanning of array)
+                %if (shape_color(1,j) == 0)
+                %    break;
+                %end
 
                 % Execute function on the current ML results
-
                 %[[LABELS: Circle,Clover,CrissCross,Diamond,Square,Starburst]]
-                % clabel can have more than the number of desired shapes
-                % (undesired blocks too)
-                [check,id] = shapeCheck(uint8(cLabels),shape_color(1,j));
-                % true = looking through all detected labels,
-                % if one of the labels = the current shape from customer image
                 
-                if (check == true)
+                % Search for any of the shapes from customer image in
+                % current frame?? (more efficient)
+                anyShape = false;
+                while (anyShape == false)
+                    for j = 1 : size(shape_color,2)
+                        [check,id] = shapeCheck(uint8(cLabels),shape_color(1,j));
+                        if (check == true)
+                            anyShape = true;
+                            break;
+                        end
+                    end
+                    break;
+                end                
 
+                %[check,id] = shapeCheck(uint8(cLabels),shape_color(1,j));
+
+                if (anyShape == true) %redundant check (keep if still using sequential)
+                    anyShape = false;    
                     correctShape = true; % if current shape from shape_col match array is detected
                     hold on
                     % Annotate Shape detection result
@@ -524,10 +532,14 @@ while (foundAllBlocks ~= true && runOnce == false)
                                                                        
                         % 3. Detected pose (match to customer's desired pose)
                             angle_roiC = [tempX-bdim/2,tempY-bdim/2,bdim,bdim];
-                            aligned_block = imcrop(tempROI_imageC,angle_roiC); % CustomerImage remains as RGB for color detection
+                            aligned_blockC = imcrop(tempROI_imageC,angle_roiC); % CustomerImage remains as RGB for color detection
 
-                            % Call function to detect orientation
-                            block_angleC = checkBlockOrientation(aligned_block);
+                            % Call function to detect orientation at
+                            % conveyor
+                            block_angleC = checkBlockOrientation(aligned_blockC);
+                            Cblock_orientation = sprintf('%.2f',block_angleC);
+                            text(tempX,tempY-50,Cblock_orientation,'FontSize',10,'Color','b')
+    
                             disp('Detected Orientation of a Desired Block');         
                             pause(0.5);
 
@@ -539,12 +551,16 @@ while (foundAllBlocks ~= true && runOnce == false)
                             %conveyorRotation,conveyorTransform,...
                             %[515.0+tempX,4.50+tempY]);
 
-                            % send through ethernet (somehow...)
+                            % send through ethernet
+                            
+                            % ---CHECK REACHABILITY---
+                            
                             robot_pick(1,3) = block_angleC;                            
-                            pick_command = sprintf('Sent PICK coordinates for block %d'...
+                            pick_command = sprintf('Sent PICK coordinates for block %d to Robot'...
                                 ,conv_match_ctr);
                             disp(pick_command);                             
-                            pause(1.0);    
+                            disp('Robot Arm Picking Block...');                             
+                            pause(5.0);    
                             tempCtr = 0;
                         
                         % If all required blocks are found
@@ -557,6 +573,9 @@ while (foundAllBlocks ~= true && runOnce == false)
                             pause(2);
                             break;
                         else
+                            
+                            disp('Robot Arm Finished Placing Block...');                             
+                            pause(2.0);
                             conv_match_ctr = conv_match_ctr + 1; % max number of blocks
                             % to scan for overall
                             correctColor = false; % reset flag                        
@@ -574,25 +593,24 @@ while (foundAllBlocks ~= true && runOnce == false)
                         %(conv_match_ctr < size(shape_color,2) && correctShape == true)
                         disp('Checking Similar Shapes?');
                         % check duplicates over array
+                        correctShape = false;
                     end                    
                 
                 end    
                 % else continue to scan live feed
-                % for next desired shape from customer
-                disp('');
+                % for next desired shape from customer                
+                disp(' ');
                 disp('~~LOOKING FOR NEXT BLOCK FROM CUSTOMER ORDER~~');         
-                disp('');
-
+                disp(' ');
+                
                 break;
             end
-        end
-        pause(0.5);
-        % check next frame?
+        %end
+        % check next frame - HERE
     end    
 end
 
 disp('[.7.] TESTING: Detected the Customer Shapes on Conveyor');
-
 %% FUNCTIONS
 
 % Check if any label from ML detector on live frame
