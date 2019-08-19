@@ -39,11 +39,14 @@ warning('off','all');
 clc;
 close all
 
-useRobotCellCamera = false;
+% Open client_server
+MTRN4230_Client_Sample()
+
+useRobotCellCamera = true;
 
 if (~useRobotCellCamera)
     disp('---USING ROBOT CELL CAMERA---');      
-    customerImage = imread('.\YOLO_TEST\Test1.jpg'); 
+    customerImage = imread('.\YOLO_TEST\Test16.jpg'); 
     figure
     imshow(customerImage);
 else
@@ -303,22 +306,41 @@ disp('[.4.] DONE: Matched Shape and Color ')
 
 bdim = 50;
 tempROI_image = ROI_image;
-for k = 1: size(image_place_data,2)
+for k = 1: size(shape_color,2)
 
     hold on
     
-    if (image_place_data(1,k) == 0 || image_place_data(2,k) == 0)
+    % avoid calculating angle if missing color/shape match up
+    if (shape_color(1,k) == 0 || shape_color(2,k) == 0)
         continue;
     end
     
     % Make temp comparison image (for each block)    
     angle_roi = [image_place_data(1,k)-bdim/2,image_place_data(2,k)-bdim/2,bdim,bdim];
     aligned_block = imcrop(tempROI_image,angle_roi); % CustomerImage remains as RGB for color detection
-            
-    % Call function to detect orientation
-    block_angle = checkBlockOrientation(aligned_block);
+    
+    % find angle - Ben's code
+%     grey = im2double(rgb2gray(aligned_block));
+%     th = otsu(grey);
+%     grey_th = grey >= th;
+%     assumptions for blob detection:
+%     - area is between 1000-1500 pixels
+%     - the blob is black (class 0; white is class 1)
+%     blob detection. detect single square. Refine blob detection
+%     blobs = iblobs(grey_th, 'boundary', 'area', [500, 1500], 'class', 0, 'aspect', [0.8,1]);
+%     edges = blobs(1).edge; % assuming only one blob has been detected - needs fixing by tightening the blob detection criteria so this is true
+%     [leftmost_x_val, leftmost_pt_ind] = min(edges(1,:));
+%     [highest_sq_y_val, highest_pt_ind] = min(edges(2,:));
+%     del_y = edges(2, leftmost_pt_ind) - edges(2, highest_pt_ind);
+%     del_x = edges(1, highest_pt_ind) - edges(1, leftmost_pt_ind);
+%     angle = atand(del_y/del_x);
+%     figure; idisp(aligned_block);
+%     title(sprintf('New angle detected is %f deg', angle));
+%             
+%     Call function to detect orientation
+%     block_angle = checkBlockOrientation(aligned_block);
 
-    image_place_data(5,k) = (round(block_angle));
+    image_place_data(5,k) = 0; %(round(block_angle));
     block_orientation = sprintf('%.2f',block_angle);
     text(image_place_data(1,k),image_place_data(2,k)-50,block_orientation,'FontSize',12,'Color','b')
     
@@ -363,6 +385,7 @@ robot_place = [world_place_data(1,:) ; world_place_data(2,:) ; world_place_data(
 % might want all place for each block in one row
 
 disp('Sent PLACE Coordinates to Robot Arm')
+pause(1.0);
 
 disp('[.6.] DONE: PLACE Coordinates');
 
@@ -379,22 +402,19 @@ foundAllBlocks = false;
 pick_array = zeros(4,size(world_place_data,2));
 checkMatch = false;
 
-%conveyorTransform
-%conveyorRotation
-
 % store world X, world Y, angle (at conveyor) for each block (in turn)
 pick_robot = zeros(1,3);
 
-usingConveyor = false;
+usingConveyor = true;
 runOnce = false;
 
 disp('---USING CONVEYOR CAMERA---');      
 figure
 while (foundAllBlocks ~= true && runOnce == false)
     
-    runOnce = true;
+    runOnce = true; %detects all the required blocks then stops
     
-    for conveyorImage = 1:length(list) - 15
+    %for conveyorImage = 1:length(list) - 10
         
         if (~usingConveyor)
             imagePath = fullfile(list(conveyorImage).folder,list(conveyorImage).name);
@@ -403,6 +423,8 @@ while (foundAllBlocks ~= true && runOnce == false)
             % Change to conveyor camera
             cImage = MTRN4230_Image_Capture([],[]); %for conveyor camera (get one frame)
             %Load camera calibration .mat file
+            load('CamData.mat');
+            pause(0.5);
             %cImage = imread('.\YOLO_TEST\ConveyorImages\C43.jpg');
 
         end
@@ -465,6 +487,9 @@ while (foundAllBlocks ~= true && runOnce == false)
                     ML_result = sprintf('Possible %s detected',labels(j));
                     disp(ML_result);
                     disp('Stop the Conveyor');
+                    % Send a sample string to the server on the robot.
+                    fwrite(socket,'C04');
+
                     pause(0.5);
 
                     % For the located shape:
@@ -545,13 +570,9 @@ while (foundAllBlocks ~= true && runOnce == false)
 
                         % 4. Send PICK Data to Robot Arm for the designated
                             % shape/color block
-                            %[515.0,4.50,676.00,720.00]
 
-                            %robot_pick(1,1:2) = pointsToWorld(conveyorCalib,...
-                            %conveyorRotation,conveyorTransform,...
-                            %[515.0+tempX,4.50+tempY]);
-
-                            % send through ethernet
+                            robot_pick(1,1:2) = pointsToWorld(camParam.CameraParameters,...
+                            R,t,[515.0+tempX,4.50+tempY]);
                             
                             % ---CHECK REACHABILITY---
                             
@@ -562,30 +583,33 @@ while (foundAllBlocks ~= true && runOnce == false)
                             disp('Robot Arm Picking Block...');                             
                             pause(5.0);    
                             tempCtr = 0;
-                        
-                        % If all required blocks are found
-                        % TODO: factor in the missing centroids
-                        if (conv_match_ctr == size(shape_color,2))
-                            foundAllBlocks = true;
-                            completed_decoration = sprintf('~~~ALL %d BLOCKS FOUND AND PLACED ON CAKE~~'...
-                                ,conv_match_ctr);
-                            disp(completed_decoration);
-                            pause(2);
-                            break;
-                        else
-                            
                             disp('Robot Arm Finished Placing Block...');                             
                             pause(2.0);
-                            conv_match_ctr = conv_match_ctr + 1; % max number of blocks
                             % to scan for overall
                             correctColor = false; % reset flag                        
-                        end
+                             
+                            % If all required blocks are found
+                            % TODO: factor in the missing centroids
+                            M = find(shape_color(1,:) == 0);
+                            if (conv_match_ctr == size(shape_color,2) - size(M,1))
+                                foundAllBlocks = true;
+                                completed_decoration = sprintf('~~~ALL %d BLOCKS FOUND AND PLACED ON CAKE~~'...
+                                    ,conv_match_ctr);
+                                disp(completed_decoration);
+                                pause(2);
+                                break;
+                            end
                    
                         % If a block and color is successfully found, remove this
                         % from the array so the conveyor does not look for it again
                         shape_color(1,j) = -1;                                
                         check = false; % reset current T/F detection
                         correctShape = false;
+                        conv_match_ctr = conv_match_ctr + 1; % max number of blocks
+                        disp('Resume moving the Conveyor');
+                        % Move conveyor
+                        fwrite(socket,'C03');
+                        pause(0.5);
                     else
                         
                         % If NOT, see if there were any other detected objects
@@ -607,10 +631,13 @@ while (foundAllBlocks ~= true && runOnce == false)
             end
         %end
         % check next frame - HERE
-    end    
+    %end    
 end
 
+% Close the socket.
+fclose(socket);
 disp('[.7.] TESTING: Detected the Customer Shapes on Conveyor');
+
 %% FUNCTIONS
 
 % Check if any label from ML detector on live frame
@@ -688,8 +715,11 @@ function block_angle = checkBlockOrientation(block_image)
     g = rgb2gray(block_image);              
     p = regionprops(g, 'Extrema'); 
     sides = p(1).Extrema(4,:) - p(1).Extrema(6,:); % Returns the sides of the square triangle that completes the two chosen extrema: Bottom-Right and Left-Bottom
-    block_angle = rad2deg(atan(-sides(2)/sides(1)));  % Note the 'minus' sign compensates for the inverted y-values in image coordinates    
+    block_angle = rad2deg(atan(-sides(2)/sides(1)));  % Note the 'minus' sign compensates for the inverted y-values in image coordinates        
     
+    if block_angle > 90
+        block_angle = block_angle - 90;
+    end
 end
 
 % HSV at Conveyor
@@ -791,3 +821,26 @@ function robot_image = MTRN4230_Image_Capture (varargin)
 %}
 end
 
+function MTRN4230_Client_Sample()
+
+% The robot's IP address.
+robot_IP_address = '192.168.125.1'; % Real robot ip address
+% robot_IP_address = '127.0.0.1'; % Simulation ip address
+
+% The port that the robot will be listening on. This must be the same as in
+% your RAPID program.
+robot_port = 1025;
+
+% Open a TCP connection to the robot.
+socket = tcpip(robot_IP_address, robot_port);
+set(socket, 'ReadAsyncMode', 'continuous');
+fopen(socket);
+
+% Check if the connection is valid.+6
+
+if(~isequal(get(socket, 'Status'), 'open'))
+    warning(['Could not open TCP connection to ', robot_IP_address, ' on port ', robot_port]);
+    return;
+end
+
+end
