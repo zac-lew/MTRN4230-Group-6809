@@ -5,7 +5,7 @@ clc;
 close all
 
 % Load .mat files
-load('FINAL_FRCNN_V4.mat','detector_updated_final');
+load('FINAL_FRCNN_V4.mat');
 load('calibrationSession.mat','calibrationSession');
 load('CamData.mat');
 
@@ -21,7 +21,7 @@ useRobotCellCamera = false; % change if using robot cell camera
 
 if (~useRobotCellCamera)
     disp('---USING ROBOT CELL CAMERA---');      
-    customerImage = imread('.\YOLO_TEST\Test10.jpg'); 
+    customerImage = imread('.\YOLO_TEST\Test16.jpg'); 
 else
     disp('---USING ROBOT CELL CAMERA---');      
     customerImage = MTRN4230_Image_Capture([]); %for robot cell
@@ -40,9 +40,9 @@ imshow(ROI_image)
 hold on
 
 % Detect Quirkle Blocks using ML detector
-ML_threshold = 0.35;
+ML_threshold = 0.40;
 [bboxes,scores,labels] = detect(detector_updated_final,highlighted_blocks_c,'Threshold',...
-    ML_threshold,'NumStrongestRegions',15);
+    ML_threshold,'NumStrongestRegions',20);
 
 % Annotate BB around detected shapes
 for j = 1 : size(bboxes,1)
@@ -193,7 +193,7 @@ while (pick_counter <= size(bboxes,1) && missingCentroid == false)
 end
 
 for r = 1 : size(shape_color,2)
-    fprintf('%s %s',whatShape(shape_color(1,r)),whatColor(shape_color(2,r)));
+    fprintf('%s %s\n',whatShape(shape_color(1,r)),whatColor(shape_color(2,r)));
 end
 
 % ---------------------Orientation of Blocks----------------------
@@ -217,7 +217,7 @@ for k = 1: size(shape_color,2)
 
     % Call function to detect orientation
     % block_angle = checkBlockOrientation(aligned_block);
-    block_angle = 5.0;        
+    block_angle = 2.0;        
     image_place_data(5,k) = round(block_angle);
     tempROI_image = ROI_image;
 end
@@ -227,12 +227,12 @@ hold off
 % Convert image points to world coordinates (PLACE)            
 world_place_data = zeros(3,size(image_place_data,1));
 
-% Robot Cell Extrinsics
-translationVector = [21.677,-377.71,859.96];
+% From Extrinsic function output
+translationVector = [21.6771020996404,-377.712398323210,859.963449998696];
 
-rotationMatrix = [-0.000,0.9999,-0.0013;...
-                0.999,0.00052,-0.0032;...
-                -0.0032,-0.0014,-0.99];
+rotationMatrix = [-0.000532049447634045,0.999998919650671,-0.00137026306816968;...
+                0.999994863561974,0.000527715353405883,-0.00316138674858810;...
+                -0.00316066022432677,-0.00137193804397179,-0.999994063988857];
 
 for bCount = 1:num_blocks
 
@@ -241,15 +241,17 @@ for bCount = 1:num_blocks
         [506.00+image_place_data(1,bCount),240.00+image_place_data(2,bCount)]);
 end
 
+disp('Obtained PLACE Coordinates');
 %% 3. Obtain PICK Coordinates at Conveyor
-while (foundAllBlocks ~= true)
 
-    correctShape = false;
-    conv_match_ctr = 1;
-    correctColor = false;
-    foundAllBlocks = false;
-    pick_array = zeros(4,size(world_place_data,2));
-    checkMatch = false;
+correctShape = false;
+conv_match_ctr = 1;
+correctColor = false;
+foundAllBlocks = false;
+pick_array = zeros(4,size(world_place_data,2));
+checkMatch = false;
+
+while (foundAllBlocks ~= true)
 
     %Xi,Yi,Xf,Yf,Angle_delta
     dataVector = zeros(1,5);
@@ -261,7 +263,7 @@ while (foundAllBlocks ~= true)
 
     %for conveyor camera (get one frame)
     %cImage = MTRN4230_Image_Capture([],[]); 
-    cImage = imread('.\YOLO_TEST\ConveyorImages\C40.jpg');
+    cImage = imread('.\YOLO_TEST\ConveyorImages\C20.jpg');
 
     cImage = imcrop(cImage,[515.0,4.50,676.00,720.00]);
 
@@ -335,6 +337,7 @@ while (foundAllBlocks ~= true)
                     % if yes -> correctColor = true;
                     correctColor = true;
                     disp('Correct Color AND Correct Shape!');
+                    plot(tempX,tempY,'g*','LineWidth',2);
                     checkMatch = false; % reset
                     csv_encoding = 0; % reset csv encoding for next
                     % shape detection
@@ -345,7 +348,7 @@ while (foundAllBlocks ~= true)
 
                 if (correctColor == true)
                     tempROI_imageC = cImage;
-                    fprintf('%d: %s %s FOUND',conv_match_ctr,whatColor(shape_color(2,j)),cLabels(id));                            
+                    fprintf('%d: %s %s FOUND\n',conv_match_ctr,whatColor(shape_color(2,j)),cLabels(id));                            
 
                     % 3. Detected pose (match to customer's desired pose)
 
@@ -353,9 +356,9 @@ while (foundAllBlocks ~= true)
                     aligned_blockC = imcrop(tempROI_imageC,angle_roiC); % CustomerImage remains as RGB for color detection
                     block_angleC = 45.0; %checkBlockOrientation(aligned_blockC);
 
-                    % 4. Send PICK Data to Robot Arm
+                    % 4. Send Data to Robot Arm
 
-                    % PICK COORDINATES
+                    % i) PICK COORDINATES
                     dataVector(1,1:2) = pointsToWorld(camParam,...
                     R,t,[515.0+tempX,4.50+tempY]);                    
                     % Swap X and Y (to match robot frame)
@@ -363,21 +366,20 @@ while (foundAllBlocks ~= true)
 
                     % ---CHECK REACHABILITY---
                     
-                    % PLACE COORDINATES                            
+                    % ii) PLACE COORDINATES                            
                     dataVector(1,3) = world_place_data(1,j);
                     dataVector(1,4) = world_place_data(2,j);
 
-                    % TODO: angle = pick  angle - place angle                                
-                    dataVector(1,5) = block_angleC - world_place_data(5,j);
+                    % iii) ANGLE                               
+                    dataVector(1,5) = block_angleC - image_place_data(5,j);
                     
-                    sendPnP(dataVector);                    
-                    fprintf('Sent FINAL coordinates for block %d to Robot'...
-                        ,conv_match_ctr);
+                    guiString = sendPnP(dataVector); %array-string HERE                  
+                    fprintf('Sent %s to GUI!\n',guiString);
 
                     %-----------------TODO------------------
-                    disp('Robot Arm Picking Block...');                             
+                    fprintf('Robot Arm Picking %s %s\n',whatColor(shape_color(2,j)),cLabels(id));                             
                     pause(3.0);    
-                    disp('Robot Arm Finished Placing Block...');                             
+                    fprintf('Robot Arm Placed %s %s\n',whatColor(shape_color(2,j)),cLabels(id));
                     pause(3.0);
                     %-----------------TODO------------------
 
@@ -423,10 +425,14 @@ disp('DONE DEMO of DECORATION');
 %% ---------------------FUNCTIONS----------------------
 
 % Array to String for GUI
-function sendPnP(dataV)
+function blockInfo = sendPnP(dataV)
     
     %Make into string 'Xi,Yi,Xf,Yf,A'
-    dataV = uint8(dataV);   
+    %32.9119  532.4741  376.4049  141.8782   43.0000
+
+    dataV = uint8(dataV);
+    stringBlock = string(dataV);    
+    blockInfo = join(stringBlock,",");
     
 end
 
