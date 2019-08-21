@@ -178,7 +178,7 @@ MODULE InkMove
             ENDFOR
         ENDIF
         ! networking - say printing is completed
-        
+        SocketSend client_socket \Str:=("MoveComplete" + "\0A");
         
         ! ----------------
         ! A point just above the target 
