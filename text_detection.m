@@ -1,39 +1,29 @@
-function text_detection()
-    close all; 
-    basename = '../cake-design-photos/'; 
-    files = dir(strcat(basename, 'table*'));
-    
-    for f = files'
-       img = iread(strcat(basename, f.name));
-       run_text_detection(img, f.name);
-       pause;
-       close all;
-    end
-        
-end
-
-function run_text_detection(img, filename)
+function [paths, stroke_im, n_blobs] = text_detection(img)
     %img = iread('../w8-photos/table (4).jpg');
+    addpath('export-fig\'); % need export-fig to export blob stroke plot
     grey = im2double(rgb2gray(img));
     %grey = im2double(grey); % normalises greyscale to [0,1] range
     [grid_th, grid_offset] = getGridRoi(grey);
     blobs = getBlobs(grid_th);
-    triple_pts = getTriplePoints(grey, grid_th, blobs);
+    %triple_pts = getTriplePoints(grey, grid_th, blobs);
 
-    n = size(blobs,2);
-    fh1 = figure; idisp(grid_th); hold on;
+    n_blobs = size(blobs,2);
+    %fh1 = figure; idisp(grid_th); hold on;
     load('irb120.mat');
+    paths = cell(1, n_blobs); 
+    stroke_im = cell(1, n_blobs); 
 
-    for i = 1:n
-       strokes_grid_frame = calculateStrokes(grid_th, blobs(i));
-       strokes_rob_frame = strokesToRobFrame(strokes_grid_frame, grid_offset);
-       plotStrokesWithRobot(strokes_rob_frame, irb120);
+    for i = 1:n_blobs
+       [strokes_grid_frame, stroke_im{i}] = calculateStrokes(grid_th, blobs(i));
+       paths{i} = strokesToRobFrame(strokes_grid_frame, grid_offset);
+       %plotStrokesWithRobot(strokes_rob_frame, irb120);
     end
     
     % plot the blobs
     %figure; imshow(grid_th);
-    %title(sprintf('%s, num blobs = %d', filename, length(blobs)));
-    %blobs.plot_box;    
+    %title(sprintf('num blobs = %d', lengt(blobs)));
+    %blobs.plot_box; 
+    %blob_img = 1;
 end
 
 function plotStrokesWithRobot(strokes_rob_frame, irb120)
@@ -122,7 +112,7 @@ end
 % Calculates the strokes of the letter. A stroke is the part of the letter
 % the end-effector can complete in one motion without going back over
 % already-placed ink. Each letter is made up of one or more strokes. 
-function strokes_grid_frame = calculateStrokes(grid_th, blob)
+function [strokes_grid_frame, stroke_im] = calculateStrokes(grid_th, blob)
     %close all;
     end_pt_th = 15;
     max_strokes = 20;
@@ -224,12 +214,11 @@ function strokes_grid_frame = calculateStrokes(grid_th, blob)
     end
     
     % plot the path
-    %figure; idisp(blob_im); hold on;
+    figure; imshow(blob_im); hold on;
     tp_offset = [blob.umin; blob.vmin] + [-2; -2];
     strokes = deleteUnusedStrokes(strokes, strokes_ind, max_strokes);
     strokes_grid_frame = changeStrokesFrame(strokes, strokes_ind, tp_offset);
     
-
     col = {'w-', 'r-', 'g-', 'y-', 'c-', 'm-', 'b-'};
     col2 = {'wo', 'ro', 'go', 'yo', 'co', 'mo', 'bo'};
     col3 = {'w+', 'r+', 'g+', 'y+', 'c+', 'm+', 'b+'};
@@ -237,10 +226,17 @@ function strokes_grid_frame = calculateStrokes(grid_th, blob)
     for i = 1:strokes_ind-1
         %figure(1); hold on;
         %plot_point(strokes_grid_frame{i}(1:2,:), col2{i});
-        plot(strokes_grid_frame{i}(1,:), strokes_grid_frame{i}(2,:),col{i});
-        plot_point(strokes_grid_frame{i}(1:2,1), col3{i});
-        plot_point(strokes_grid_frame{i}(1:2,end), col3{i+1});
+        
+        %plot(strokes_grid_frame{i}(1,:), strokes_grid_frame{i}(2,:),col{i});
+        %plot_point(strokes_grid_frame{i}(1:2,1), col3{i});
+        %plot_point(strokes_grid_frame{i}(1:2,end), col3{i+1});
+        
+        plot(strokes{i}(1,:), strokes{i}(2,:),col{i});
+        plot_point(strokes{i}(1:2,1), col3{i});
+        plot_point(strokes{i}(1:2,end), col3{i+1});
     end
+    
+    stroke_im = export_fig();
 end
 
 function strokes = deleteUnusedStrokes(strokes, strokes_ind, max_strokes)
