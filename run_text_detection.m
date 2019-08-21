@@ -11,12 +11,14 @@ function run_text_detection()
 %     end
     
     img = iread('../w8-photos/table (6).jpg');
-    [paths, blob_im, n_blobs] = text_detection(img);
+    [blob_paths, blob_im, n_blobs] = text_detection(img);
     
     for i = 1:n_blobs
-        n_strokes = size(paths{i}, 2);
+        n_strokes = size(blob_paths{i}, 2);
+        
+        % iterate through all the strokes for this blob
         for j = 1:n_strokes
-            stroke = paths{i}{j};
+            stroke = blob_paths{i}{j};
             % send the stroke
         end
     end
