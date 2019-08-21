@@ -13,19 +13,34 @@ function text_detection()
 end
 
 function run_text_detection(img, filename)
-    img = iread('../w8-photos/table (4).jpg');
+    %img = iread('../w8-photos/table (4).jpg');
     grey = im2double(rgb2gray(img));
-    grey = im2double(grey); % normalises greyscale to [0,1] range
-    grid_th = getGridRoi(grey);
+    %grey = im2double(grey); % normalises greyscale to [0,1] range
+    [grid_th, grid_offset] = getGridRoi(grey);
     blobs = getBlobs(grid_th);
     triple_pts = getTriplePoints(grey, grid_th, blobs);
 
     n = size(blobs,2);
-    figure; idisp(grid_th); hold on;
+    fh1 = figure; idisp(grid_th); hold on;
+    %fh2 = figure;
+    load('irb120.mat');
+    qz = [0 0 0 0 0 0];
+    %irb120.plot(qz);
     
     for i = 1:n
 
-       strokes = calculateStrokes(grid_th, blobs(i));
+       strokes_grid_frame = calculateStrokes(grid_th, blobs(i));
+       strokes_rob_frame = strokesToRobFrame(strokes_grid_frame, grid_offset);
+
+       fh2 = figure;
+       n = size(strokes_rob_frame, 2);
+
+       for i = 1:n
+           n_pts = size(strokes_rob_frame{i},1);
+           plot3(strokes_rob_frame{i}(:,1), strokes_rob_frame{i}(:,2), 0.147*ones(n_pts,1), 'k', 'LineWidth', 1);
+           irb120.plot(qz);           
+           close(fh2);
+       end
     end
     
     % plot the blobs
@@ -34,12 +49,13 @@ function run_text_detection(img, filename)
     %blobs.plot_box;    
 end
 
-function grid_th = getGridRoi(grey)
+function [grid_th, grid_offset] = getGridRoi(grey)
     % grid_roi_rect = [470,1112;346,703]; % found with iroi
     grid_roi_rect = [418,1182;285,789]; % covers all grid squares, including side ones
     th = otsu(grey);
     grey_th = (grey >= th); 
     grid_th = iroi(grey_th, grid_roi_rect);
+    grid_offset = [grid_roi_rect(1,1); grid_roi_rect(2,1)];
 end
 
 function blobs = getBlobs(grid_th)
@@ -105,7 +121,7 @@ end
 % Calculates the strokes of the letter. A stroke is the part of the letter
 % the end-effector can complete in one motion without going back over
 % already-placed ink. Each letter is made up of one or more strokes. 
-function strokes = calculateStrokes(grid_th, blob)
+function strokes_grid_frame = calculateStrokes(grid_th, blob)
     %close all;
     end_pt_th = 15;
     max_strokes = 20;
@@ -209,7 +225,9 @@ function strokes = calculateStrokes(grid_th, blob)
     % plot the path
     %figure; idisp(blob_im); hold on;
     tp_offset = [blob.umin; blob.vmin] + [-2; -2];
+    strokes = deleteUnusedStrokes(strokes, strokes_ind, max_strokes);
     strokes_grid_frame = changeStrokesFrame(strokes, strokes_ind, tp_offset);
+    
 
     col = {'w-', 'r-', 'g-', 'y-', 'c-', 'm-', 'b-'};
     col2 = {'wo', 'ro', 'go', 'yo', 'co', 'mo', 'bo'};
@@ -222,6 +240,27 @@ function strokes = calculateStrokes(grid_th, blob)
         plot_point(strokes_grid_frame{i}(1:2,1), col3{i});
         plot_point(strokes_grid_frame{i}(1:2,end), col3{i+1});
     end
+end
+
+function strokes = deleteUnusedStrokes(strokes, strokes_ind, max_strokes)
+    for i = max_strokes:-1:strokes_ind
+       strokes(i) = []; 
+    end
+end
+
+function rob_strokes = strokesToRobFrame(strokes, offset)
+    n = size(strokes, 2);
+    rob_strokes = cell(1, n);
+    
+    load('cameraParams.mat');
+    load('rot_matrix.mat');
+    load('trans_mat.mat');    
+
+    for i = 1:n
+       strokes{i}(1:2,:) = strokes{i}(1:2,:) + offset;
+       rob_strokes{i} = pointsToWorld(cameraParams, R, t, strokes{i}(1:2,:)') / 1000;
+    end
+    %strokes_cam = changeStrokesFrame(strokes_grid_frame, n, grid_offset);
 end
 
 function strokes = changeStrokesFrame(strokes, strokes_ind, offset)
