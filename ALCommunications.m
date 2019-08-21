@@ -1,5 +1,11 @@
-function inkFlag = ALCommunications( data,thickOrThin)
+% Aloysius Lee 
+% Robot Engineer Ink Printing 
+% This file transfer data to Robot Studios 
+% 21/08
+
 % This file is run with run_text_detection
+
+function inkFlag = ALCommunications( data,thickOrThin)
 
 %     robot_IP_address = '192.168.125.1';
     robot_IP_address = '127.0.0.1'; % Simulation ip address
@@ -62,10 +68,15 @@ function inkFlag = ALCommunications( data,thickOrThin)
             i = i + 1;
             disp(i);
         end
-
+        % end line 
+        while (~strcmp(str,"MoveComplete"))
+            disp('Waiting for MoveComplete');
+            str = fgetl(socket);
+            disp(str);
+        end
         break; 
     end
-    pause(2);
+    pause(1);
 
     % Close the socket.
     fclose(socket);
