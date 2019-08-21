@@ -51,20 +51,18 @@ MODULE InkMove
         ENDIF
         !ListenForAndAcceptConnection;
         !----------------------------
+        
         MoveToCalibPos;
 
         ! drawing loop
         WHILE startFlag = 1 DO
             ListenForAndAcceptConnection;
-            ! Data recieving
-            ! - first number of x y points 
-            ! - second is thin or thick boolean
-            ! - all other values are X, Y pos 
             !------------
-            ! Get Setup trajectory data 
+            ! Get trajectory data 
             ! Get data
             ! - about number of points 
             ! - thin or thick
+            !    - all other values are X, Y pos
             !------------
             ! Receive a string from the client.
             !SocketReceive client_socket \Str:=received_str;
@@ -94,17 +92,16 @@ MODULE InkMove
                 size := gotData{1}; 
                 ! - second value is thick or thin 
                 thickThin := gotData{2}; 
-                ! if size = -10000: end the program 
-                IF size = -10000 THEN
+                ! either get trajectory data or exit program
+                count := 1;
+                ! if size < count end the program 
+                IF size < count THEN
                     startFlag := 0;     ! break out and exit 
                     SocketSend client_socket \Str:=("Thank_You:_Closing_Connection" + "\0A");
                 ENDIF
-                
-                ! networking - ask for next lot of data 
                 !============================
                 ! Get trajectory data 
                 ! populate an array DrawPt: 2 at a time 
-                count := 1;
                 WHILE count <= size DO
                     ! Get data from networking
                     !------------
@@ -136,15 +133,12 @@ MODULE InkMove
                 ENDWHILE
                 !--------
                 IF size > 0 THEN
-                    ! move to the starting position 
-                    Pos1.trans := [DrawPt{1,1},DrawPt{1,2},Table_upOff];
-                    ! Move just above the object
-                    MoveJ Offs(Pos1,0,0,0), v200, fine, tSCup;
                     
                     ! Begin Ink tracing 
                     PrintLetter thickThin; 
                     
-                    ! networking - say printing is completed
+                    
+                    
                 ENDIF
             ENDIF
             CloseConnection;
@@ -161,9 +155,15 @@ MODULE InkMove
         VAR robtarget Pos1 := pZeros; 
         VAR num Table_upOff := zTab + 50;
         
-        ! networking send -> ink is printing
-
-    
+        ! move to the starting position 
+        Pos1.trans := [DrawPt{1,1},DrawPt{1,2},Table_upOff];
+        ! Move just above the object
+        MoveJ Offs(Pos1,0,0,0), v200, fine, tSCup;
+        
+        ! ----------------            
+        ! networking - ink printing has started
+                    
+        
         ! if 1 = thick line 
         IF thick_thin = 0 THEN 
             FOR i FROM 1 TO size DO
@@ -174,13 +174,13 @@ MODULE InkMove
         ELSEIF thick_thin = 1 THEN
            FOR i FROM 1 TO size DO
                 Pos1.trans := [DrawPt{i,1},DrawPt{i,2}, Table_upOff];
-                MoveL Pos1, v20, fine, tSCup;
+                MoveL Pos1, v100, fine, tSCup;
             ENDFOR
         ENDIF
+        ! networking - say printing is completed
         
-        ! networking send -> ink is done printing
         
-        
+        ! ----------------
         ! A point just above the target 
         MoveJ Offs(Pos1,0,0,50), v200, fine, tSCup;
         ! MoveToCalibPos;
