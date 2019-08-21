@@ -5,9 +5,9 @@ clc;
 close all;
 
 % Load .mat files
-load('FINAL_FRCNN_V5.mat');
-load('CalibConv.mat');
-load('CalibTable.mat');
+%load('FINAL_FRCNN_V5.mat');
+%load('CalibConv.mat');
+%load('CalibTable.mat');
 
 %% 1. Set up TCP Connection
 
@@ -22,7 +22,7 @@ useRobotCellCamera = false; % change if using robot cell camera
 
 if (~useRobotCellCamera)
     disp('---USING ROBOT CELL CAMERA---');      
-    customerImage = imread('.\YOLO_TEST\Test3.jpg'); 
+    customerImage = imread('.\YOLO_TEST\Test4.jpg'); 
 else
     disp('---USING ROBOT CELL CAMERA---');      
     customerImage = MTRN4230_Image_Capture([]); %for robot cell
@@ -37,9 +37,9 @@ imshow(ROI_image)
 hold on
 
 % Detect Quirkle Blocks using ML detector
-ML_threshold = 0.15;
+ML_threshold = 0.2;
 [bboxes,scores,labels] = detect(detector_updated_FINAL,ROI_image,'Threshold',...
-    ML_threshold,'NumStrongestRegions',20);
+    ML_threshold,'NumStrongestRegions',15);
 
 % Remove double detections from ML
 sorted_detect = sort(scores,'descend');
@@ -192,6 +192,7 @@ while (pick_counter <= size(bboxes,1) && missingCentroid == false)
             shape_color(1,pick_counter) = labels(pick_counter);
             % Store which color (matching)
             shape_color(2,pick_counter) = image_place_data(4,j);
+            shape_color(3:4,pick_counter) = image_place_data(1:2,j);
             pick_counter = pick_counter + 1; % fill in shape_color array
             % after each successful match
             % Break out of loop
@@ -239,44 +240,42 @@ for k = 1: size(shape_color,2)
     end
 
     % Make temp comparison image (for each block)    
-    angle_roi = [image_place_data(1,k)-bdim/2,image_place_data(2,k)-bdim/2,bdim,bdim];
+    angle_roi = [shape_color(3,k)-bdim/2,shape_color(4,k)-bdim/2,bdim,bdim];
     aligned_block = imcrop(tempROI_image,angle_roi); % CustomerImage remains as RGB for color detection
 
     % Call function to detect orientation
     % block_angle = checkBlockOrientation(aligned_block);
     block_angle = 2.0;        
-    image_place_data(5,k) = round(block_angle);
+    shape_color(5,k) = round(block_angle);
     tempROI_image = ROI_image;
 end
 
 hold off
 
-% Convert image points to world coordinates (PLACE)            
-world_place_data = zeros(4,size(image_place_data,1));
-
+% Convert image points to world coordinates (PLACE)
 for bCount = 1:num_blocks
-    world_place_data(1:2,bCount) = pointsToWorld(camParam_Table,...
+    shape_color(3:4,bCount) = pointsToWorld(camParam_Table,...
         R_Table,t_Table,...
-        [559.51+image_place_data(1,bCount),290.51+image_place_data(2,bCount)]);
+        [559.51+shape_color(3,bCount),290.51+shape_color(4,bCount)]);
 end
 
 disp('Obtained PLACE Coordinates');
 %% 3. Obtain PICK Coordinates at Conveyor
+disp('---USING CONVEYOR CAMERA---');      
 
 correctShape = false;
 conv_match_ctr = 1;
 correctColor = false;
 foundAllBlocks = false;
-pick_array = zeros(4,size(world_place_data,2));
 checkMatch = false;
 frameScanOnce = false;
 nextPulse = true;
 pulseCounter = 1;
+noShape = false;
 
-cImage = imread('.\YOLO_TEST\ConveyorImages\C12.jpg');
-    cImage = imcrop(cImage,[515.0,4.50,676.00,720.00]);
-    figure
-    imshow(cImage);
+cImage = imread('.\YOLO_TEST\ConveyorImages\C10.jpg');
+cImage = imcrop(cImage,[515.0,4.50,676.00,720.00]);
+figure
 
 while (foundAllBlocks ~= true)
 
@@ -284,34 +283,28 @@ while (foundAllBlocks ~= true)
     dataVector = zeros(1,5);
     
     % Pulse conveyor along if no more potential blocks in 
-    % current frame
-    if (nextPulse)
-        %fwrite(socket,'C03');
-        pause(0.75);
-        pulseCounter = pulseCounter + 1;        
-        %fwrite(socket,'C04');
-    end
-        
-        if (frameScanOnce == false)
-            frameScanOnce = true;
+    % current frame (direction,enable)
+    moveConveyor(true,true);
             
-            %for conveyor camera (get one frame)
-            %cImage = MTRN4230_Image_Capture([],[]); 
-            %cImage = imcrop(cImage,[515.0,4.50,676.00,720.00]);
-            
-            [cBboxes,~,cLabels] = detect(detector_updated_FINAL,cImage,'Threshold',0.30,...
-                    'NumStrongestRegions',10);
-            posMatchNum = 0;
-            for posMatch = 1 : size(shape_color,2)
-                [check,~] = shapeCheck(uint8(cLabels),shape_color(1,posMatch));
-                if (check == true)
-                    posMatchNum = posMatchNum + 1;
-                end
-            end
-        end
-        
-        while (correctShape == false)        
+    %for conveyor camera (get one frame)
+    %cImage = MTRN4230_Image_Capture([],[]); 
+    %cImage = imcrop(cImage,[515.0,4.50,676.00,720.00]);
 
+    [cBboxes,~,cLabels] = detect(detector_updated_FINAL,cImage,'Threshold',0.30,...
+            'NumStrongestRegions',10);
+    tempLabels = uint8(cLabels);
+
+    posMatchNum = 0;
+    for posMatch = 1 : size(cBboxes,1)
+        matchCheck = uint8(cLabels);
+        if (ismember(matchCheck(posMatch),shape_color(1,:)) ~= 0)
+            posMatchNum = posMatchNum + 1;
+        end
+    end 
+        
+        % for each frame at a time
+        while (~noShape && posMatchNum > 0)
+            
             % Look for a shape_color pair in current frame @ conveyor                            
             anyShape = false;
             while (anyShape == false)
@@ -319,177 +312,173 @@ while (foundAllBlocks ~= true)
                     [check,id] = shapeCheck(uint8(cLabels),shape_color(1,j));
                     if (check == true)
                         anyShape = true;
-                        posMatchNum = posMatchNum - 1;
+                        tempID = id;
+                        tempJ = j;
                         break;
                     end
-                end
+                end          
                 break;
-            end                
+            end    
+            
+             % no shape found in current frame
+             % if anyShape is still false after all labels
+             if (anyShape == false)
+                 noShape = true;
+                 break;
+             end 
+            
+            % Found one of the potential matching shapes
+            posMatchNum = posMatchNum - 1;
+            correctShape = true; 
 
-            if (anyShape == true) %redundant check (keep if still using sequential)
-                anyShape = false;    
-                correctShape = true; % if current shape from shape_col match array is detected
+            disp('Shape Found!');                   
+            % Annotate Shape detection result
+            imshow(cImage);
+            hold on
+            rectangle('Position',[cBboxes(tempID,1),cBboxes(tempID,2),cBboxes(tempID,3),cBboxes(tempID,4)],'EdgeColor'...
+                ,'g','LineWidth',2); 
 
-                disp('Stop the Conveyor!');                   
-                % Annotate Shape detection result
-                %imshow(cImage);
-                hold on
-                rectangle('Position',[cBboxes(id,1),cBboxes(id,2),cBboxes(id,3),cBboxes(id,4)],'EdgeColor'...
-                    ,'g','LineWidth',2); 
+            % 2. Check if the matched shape is in right color
+            tempCtr = 0;                 
 
-                % 2. Check if the matched shape is in right color
-                tempCtr = 0;                 
-                
-                % Create mask to find pixels with desired RGB ranges (binary mask) -
-                % from customer image results
-                csv_encoding = shape_color(2,j);
-                [color_rgb_hi,color_rgb_low] = RGB_IteratorC(csv_encoding);               
+            % Create mask to find pixels with desired RGB ranges (binary mask) -
+            % from customer image results
+            csv_encoding = shape_color(2,tempJ);
+            [color_rgb_hi,color_rgb_low] = RGB_IteratorC(csv_encoding);               
 
-                mask_desiredC = (cImage(:,:,1) >= color_rgb_low(1)) & (cImage(:,:,1) <= color_rgb_hi(1)) & ...
-                        (cImage(:,:,2) >= color_rgb_low(2) ) & (cImage(:,:,2) <= color_rgb_hi(2)) & ...
-                        (cImage(:,:,3) >= color_rgb_low(3) ) & (cImage(:,:,3) <= color_rgb_hi(3));
+            mask_desiredC = (cImage(:,:,1) >= color_rgb_low(1)) & (cImage(:,:,1) <= color_rgb_hi(1)) & ...
+                    (cImage(:,:,2) >= color_rgb_low(2) ) & (cImage(:,:,2) <= color_rgb_hi(2)) & ...
+                    (cImage(:,:,3) >= color_rgb_low(3) ) & (cImage(:,:,3) <= color_rgb_hi(3));
 
-                statsC = regionprops(mask_desiredC,'basic');
-                Ccentroids = cat(1,statsC.Centroid);
-                Careas = cat(1,statsC.Area); %(suitable area > 150)
-                [~,sorted_area_rowC] = sort(Careas,'descend'); 
-
-                if (size(sorted_area_rowC,1) < 2)
-                    continue;
-                end
-
-                % check labels detected at conveyor    
-                colFound = false;
+            statsC = regionprops(mask_desiredC,'basic');
+            Ccentroids = cat(1,statsC.Centroid);
+            Careas = cat(1,statsC.Area); %(suitable area > 150)
+            [sorted_area_C,sorted_area_rowC] = sort(Careas,'descend'); 
+            
+            if (size(sorted_area_rowC,1) > 0)
+                 % check labels detected at conveyor                    
                 for ctr = 1 : size(shape_color,2)
-                    checkMatch = isInROI(cBboxes(id,:),Ccentroids(sorted_area_rowC(ctr),1),...
+                    checkMatch = isInROI(cBboxes(tempID,:),Ccentroids(sorted_area_rowC(ctr),1),...
                         Ccentroids(sorted_area_rowC(ctr),2));
-                    if (checkMatch == true && colFound == false)
+                    if (checkMatch == true && sorted_area_C(ctr) > 40)
                         %which color was in BBox of correct shape
                         colFound = true; 
                         tempCtr = checkMatch; 
                         tempX = Ccentroids(sorted_area_rowC(ctr),1);
                         tempY = Ccentroids(sorted_area_rowC(ctr),2);
+                        correctColor = true;
+                        %disp('Correct Color AND Correct Shape!');
+                        plot(tempX,tempY,'g*','LineWidth',2);
+                        checkMatch = false; % reset
+                        csv_encoding = 0; % reset csv encoding for next
                     end
+                end  
+            else
+                correctColor = false;
+                disp('Incorrect Color BUT Correct Shape!');
+            end               
+            
+            if (correctColor == true)
+                tempROI_imageC = cImage;
+                fprintf('%d: %s %s FOUND\n',conv_match_ctr,whatColor(shape_color(2,tempJ)),cLabels(tempID));                            
+
+                % 3. Detected pose (match to customer's desired pose)
+
+                angle_roiC = [tempX-bdim/2,tempY-bdim/2,bdim,bdim];
+                aligned_blockC = imcrop(tempROI_imageC,angle_roiC); % CustomerImage remains as RGB for color detection
+                block_angleC = 45.0; %checkBlockOrientation(aligned_blockC);
+
+                % 4. Send Data to Robot Arm
+
+                % i) PICK COORDINATES
+                dataVector(1,1:2) = pointsToWorld(camParam_Conv,...
+                R_Conv,t_Conv,[515.0+tempX,4.50+tempY]);                    
+                % Swap X and Y (to match robot frame)
+                dataVector(1,[1,2]) = dataVector(1,[2,1]); 
+
+                % ---CHECK REACHABILITY (world coordinates)---
+                robotReach = sqrt(dataVector(1,1)^2 + (dataVector(1,2)^2));
+                if (robotReach > 23 && robotReach < 550)
+                    %  do nothing
+                else
+                    disp('Not Reachable');
+                    % move conveyor back/forwards depending on number
                 end
 
-                % scan over largest centroids in matching color
-                if (tempCtr == true) 
-                    % if yes -> correctColor = true;
-                    correctColor = true;
-                    disp('Correct Color AND Correct Shape!');
-                    plot(tempX,tempY,'g*','LineWidth',2);
-                    checkMatch = false; % reset
-                    csv_encoding = 0; % reset csv encoding for next
-                    % shape detection
-                else
-                    correctColor = false;
-                    disp('Incorrect Color BUT Correct Shape!');
-                end                                
+                % ii) PLACE COORDINATES                            
+                dataVector(1,3) = shape_color(3,tempJ);
+                dataVector(1,4) = shape_color(4,tempJ);
 
-                if (correctColor == true)
-                    tempROI_imageC = cImage;
-                    fprintf('%d: %s %s FOUND\n',conv_match_ctr,whatColor(shape_color(2,j)),cLabels(id));                            
+                % iii) ANGLE                               
+                dataVector(1,5) = block_angleC - shape_color(5,tempJ);
 
-                    % 3. Detected pose (match to customer's desired pose)
+                guiString = sendPnP(dataVector); %array-string HERE                  
+                fprintf('Sent %s to GUI!\n',guiString);
 
-                    angle_roiC = [tempX-bdim/2,tempY-bdim/2,bdim,bdim];
-                    aligned_blockC = imcrop(tempROI_imageC,angle_roiC); % CustomerImage remains as RGB for color detection
-                    block_angleC = 45.0; %checkBlockOrientation(aligned_blockC);
+                tempCtr = 0;
+                % to scan for overall
+                correctColor = false; % reset flag                        
 
-                    % 4. Send Data to Robot Arm
+                % If all required blocks are found
+                conveyFound = find(shape_color(1,:) ~= 0);
+                if (conv_match_ctr == size(conveyFound,2))
+                    foundAllBlocks = true;
+                    fprintf('~~~ALL %d BLOCKS FOUND AND PLACED ON CAKE~~'...
+                        ,conv_match_ctr);
+                    % sendPnP sends '[0,0,0,0,0]'
+                    doneAllBlocks = [0,0,0,0,0];
+                    finishPnP = sendPnP(doneAllBlocks); %array-string HERE                  
+                    fprintf('Sent %s to GUI!\n',finishPnP);
+                    pause(2);
+                    break;
+                end
 
-                    % i) PICK COORDINATES
-                    dataVector(1,1:2) = pointsToWorld(camParam_Conv,...
-                    R_Conv,t_Conv,[515.0+tempX,4.50+tempY]);                    
-                    % Swap X and Y (to match robot frame)
-                    dataVector(1,[1,2]) = dataVector(1,[2,1]); 
+                % If a block and color is successfully found, remove this
+                % from the array so the conveyor does not look for it again
+                shape_color(1,tempJ) = -1;                                
+                check = false; % reset current T/F detection
+                correctShape = false;
+                conv_match_ctr = conv_match_ctr + 1; % increase no. successful
+                % block matches
+                anyShape = false;
+                %close;
 
-                    % ---CHECK REACHABILITY (world coordinates)---
-                    robotReach = sqrt(dataVector(1,1)^2 + (dataVector(1,2)^2));
-                    if (robotReach > 23 && robotReach < 550)
-                        %  do nothing
-                    else
-                        disp('Not Reachable');
-                        break;
-                    end
-                    
-                    % ii) PLACE COORDINATES                            
-                    dataVector(1,3) = world_place_data(1,j);
-                    dataVector(1,4) = world_place_data(2,j);
-
-                    % iii) ANGLE                               
-                    dataVector(1,5) = block_angleC - image_place_data(5,j);
-                    
-                    guiString = sendPnP(dataVector); %array-string HERE                  
-                    fprintf('Sent %s to GUI!\n',guiString);
-
-                    tempCtr = 0;
-                    % to scan for overall
-                    correctColor = false; % reset flag                        
-
-                    % If all required blocks are found
-                    conveyFound = find(shape_color(1,:) ~= 0);
-                    if (conv_match_ctr == conveyFound)
-                        foundAllBlocks = true;
-                        fprintf('~~~ALL %d BLOCKS FOUND AND PLACED ON CAKE~~'...
-                            ,conv_match_ctr);
-                        % sendPnP sends '[0,0,0,0,0]'
-                        doneAllBlocks = [0,0,0,0,0];
-                        finishPnP = sendPnP(doneAllBlocks); %array-string HERE                  
-                        fprintf('Sent %s to GUI!\n',finishPnP);
-                        pause(2);
-                        break;
-                    end
-
-                    % If a block and color is successfully found, remove this
-                    % from the array so the conveyor does not look for it again
-                    shape_color(1,j) = -1;                                
-                    check = false; % reset current T/F detection
-                    correctShape = false;
-                    conv_match_ctr = conv_match_ctr + 1; % increase no. successful
-                    % block matches
-                    
-                    % Not all required blocks are on conveyor
-                    if(pulseCounter > 4)
-                        disp('NEED more Blocks');
-                        pause(5.0);
-                    end
-                    
-                    %close;
-                    
-                else
-
-                    % If NOT, see if there were any other detected objects
-                    % in same frame
-                    disp('KEEP FRAME')
-                    shape_color(1,j) = -1;
-                    correctShape = false;
-                    
-                    % disable next pulse
-                    % do not scan again (still same frame)
-                    nextPulse = false;
-                    frameScanOnce = true;
-                    
-                    if (posMatchNum == 0)
-                        % enable next pulse
-                        % scan frame
-                        nextPulse = true;
-                        frameScanOnce = false;
-                    end
-                    
-                    %close;
-                end                    
-
-            end                    
-            break;
+            else
+                % Correct shape but wrong color
+                disp('KEEP FRAME')                    
+                % if only one of a shape
+                shape_color(1,tempJ) = -1;
+                nextPulse = false;          
+                anyShape = false;    
+                correctShape = false;                        
+                %close;
+            end
         end
-    disp('NEXT'); %search next pulse/frame         
-    
 end
 
 disp('DONE DEMO of DECORATION');
 
 %% ---------------------FUNCTIONS----------------------
+
+% Move Conveyor Forwards
+function moveConveyor(direction,enable)
+    
+    global socket;    
+
+    if (enable)
+        if (direction)
+            %fwrite command for direction
+            %fwrite(socket,'C03');
+            pause(0.75);
+            %fwrite(socket,'C04');
+        else
+            %fwrite command for direction
+            %fwrite(socket,'C03');
+            pause(0.75);
+            %fwrite(socket,'C04');
+        end
+    end
+end
 
 % Array to String for GUI
 function blockInfo = sendPnP(dataV)
