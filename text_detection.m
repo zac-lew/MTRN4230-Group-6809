@@ -22,31 +22,32 @@ function run_text_detection(img, filename)
 
     n = size(blobs,2);
     fh1 = figure; idisp(grid_th); hold on;
-    %fh2 = figure;
     load('irb120.mat');
-    qz = [0 0 0 0 0 0];
-    %irb120.plot(qz);
-    
-    for i = 1:n
 
+    for i = 1:n
        strokes_grid_frame = calculateStrokes(grid_th, blobs(i));
        strokes_rob_frame = strokesToRobFrame(strokes_grid_frame, grid_offset);
-
-       fh2 = figure;
-       n = size(strokes_rob_frame, 2);
-
-       for i = 1:n
-           n_pts = size(strokes_rob_frame{i},1);
-           plot3(strokes_rob_frame{i}(:,1), strokes_rob_frame{i}(:,2), 0.147*ones(n_pts,1), 'k', 'LineWidth', 1);
-           irb120.plot(qz);           
-           close(fh2);
-       end
+       plotStrokesWithRobot(strokes_rob_frame, irb120);
     end
     
     % plot the blobs
     %figure; imshow(grid_th);
     %title(sprintf('%s, num blobs = %d', filename, length(blobs)));
     %blobs.plot_box;    
+end
+
+function plotStrokesWithRobot(strokes_rob_frame, irb120)
+    n = size(strokes_rob_frame, 2);
+    qz = [0 0 0 0 0 0];    
+    
+    for i = 1:n
+        fh2 = figure;
+        n_pts = size(strokes_rob_frame{i},1);
+        plot3(strokes_rob_frame{i}(:,1), strokes_rob_frame{i}(:,2), 0.147*ones(n_pts,1), 'k', 'LineWidth', 1);
+        irb120.plot(qz);
+        pause;
+        close(fh2);
+    end
 end
 
 function [grid_th, grid_offset] = getGridRoi(grey)
