@@ -193,6 +193,7 @@ function strokes = calculateStrokes(grid_th, blob)
             if distToPt(cur_pt, last_tp) > end_pt_th 
                % keep this segment and finish the stroke 
                [seg_ind, strk_ind, strk] = flushSeg(seg_ind, strk_ind, seg, strk);
+               [strk_ind, strokes_ind, strokes, strk] = flushStroke(strokes_ind, strk_ind, strk, strokes);
                next_pt = unexplored_tps(:, n_unexplored);
             else 
                % discard this segment, and move back to the last tp
