@@ -5,9 +5,9 @@ clc;
 close all;
 
 % Load .mat files
-%load('FINAL_FRCNN_V4.mat');
-%load('CalibConv.mat');
-%load('CalibTable.mat');
+load('FINAL_FRCNN_V5.mat');
+load('CalibConv.mat');
+load('CalibTable.mat');
 
 %% 1. Set up TCP Connection
 
@@ -22,14 +22,14 @@ useRobotCellCamera = false; % change if using robot cell camera
 
 if (~useRobotCellCamera)
     disp('---USING ROBOT CELL CAMERA---');      
-    customerImage = imread('.\YOLO_TEST\Test5.jpg'); 
+    customerImage = imread('.\YOLO_TEST\Test3.jpg'); 
 else
     disp('---USING ROBOT CELL CAMERA---');      
     customerImage = MTRN4230_Image_Capture([]); %for robot cell
 end
 
 %[a,b] = imcrop(customerImage);
-rectROI = [548.51,286.51,494.98,497.98];
+rectROI = [560.51,290.51,477.98,485.98];
 ROI_image = imcrop(customerImage,rectROI); 
 
 figure
@@ -38,8 +38,8 @@ hold on
 
 % Detect Quirkle Blocks using ML detector
 ML_threshold = 0.15;
-[bboxes,scores,labels] = detect(detector_updated_final,ROI_image,'Threshold',...
-    ML_threshold,'NumStrongestRegions',25);
+[bboxes,scores,labels] = detect(detector_updated_FINAL,ROI_image,'Threshold',...
+    ML_threshold,'NumStrongestRegions',20);
 
 % Remove double detections from ML
 sorted_detect = sort(scores,'descend');
@@ -57,6 +57,8 @@ for j = 1 : size(bboxes,1)
         end    
     end
 end  
+
+bboxes = bboxes(any(bboxes,2),:);
 
 % Annotate BB around detected shapes
 for j = 1 : size(bboxes,1)
@@ -118,7 +120,7 @@ for h = curr_filter_on:max_hsv % encoding RGBY as 1234
 
     areas = cat(1,stats.Area); %(suitable area > 150)
     [sort_area_m,sorted_area_row] = sort(areas,'descend'); 
-    min_block_size = 450;
+    min_block_size = 300;
     % Checking max number of items WITH a particular HSV filter
     for p = 1:filter_counter
 
@@ -157,8 +159,8 @@ for j = 1 : size(cv_block_struct,2)
         D = sqrt((cv_block_struct(1,j) - cv_block_struct(1,check_ctr))^2 +...
             (cv_block_struct(2,j) - cv_block_struct(2,check_ctr))^2);
         if (D < 10 && D > 0)
-            cv_block_struct(1,check_ctr) = 0;
-            cv_block_struct(2,check_ctr) = 0;
+           cv_block_struct(1,check_ctr) = 0;
+           cv_block_struct(2,check_ctr) = 0;
         end    
     end
 end            
@@ -170,12 +172,19 @@ j = 1;
 missingCentroid = false;
 shape_color = zeros(2,size(bboxes,1));
 image_place_data = fix(image_place_data);
+missingBlockMatch = find(all(bboxes == 0,2));
+missingNumber = size(missingBlockMatch,1);
 
 while (pick_counter <= size(bboxes,1) && missingCentroid == false)
     % each bounding box vector from FRCNN in turn
+    % Skip over double detection
+    if (bboxes(pick_counter,1) == 0)
+        pick_counter = pick_counter + 1;
+    end
     ROI = bboxes(pick_counter,:); 
     while (j <= size(bboxes,1))
         % check if any of the color/centroids are in this current ROI 
+        
         tf = isInROI(ROI,image_place_data(1,j),image_place_data(2,j));
 
         if (tf == true)            
@@ -246,10 +255,9 @@ hold off
 world_place_data = zeros(4,size(image_place_data,1));
 
 for bCount = 1:num_blocks
-
     world_place_data(1:2,bCount) = pointsToWorld(camParam_Table,...
         R_Table,t_Table,...
-        [548.51+image_place_data(1,bCount),286.51+image_place_data(2,bCount)]);
+        [559.51+image_place_data(1,bCount),290.51+image_place_data(2,bCount)]);
 end
 
 disp('Obtained PLACE Coordinates');
@@ -263,8 +271,9 @@ pick_array = zeros(4,size(world_place_data,2));
 checkMatch = false;
 frameScanOnce = false;
 nextPulse = true;
+pulseCounter = 1;
 
-cImage = imread('.\YOLO_TEST\ConveyorImages\Test5_C.jpg');
+cImage = imread('.\YOLO_TEST\ConveyorImages\C12.jpg');
     cImage = imcrop(cImage,[515.0,4.50,676.00,720.00]);
     figure
     imshow(cImage);
@@ -279,19 +288,20 @@ while (foundAllBlocks ~= true)
     if (nextPulse)
         %fwrite(socket,'C03');
         pause(0.75);
+        pulseCounter = pulseCounter + 1;        
         %fwrite(socket,'C04');
     end
-    
-    %for conveyor camera (get one frame)
-    %cImage = MTRN4230_Image_Capture([],[]); 
-    %cImage = imcrop(cImage,[515.0,4.50,676.00,720.00]);
-
-    [cBboxes,~,cLabels] = detect(detector_updated_final,cImage,'Threshold',0.30,...
-         'NumStrongestRegions',10);
         
         if (frameScanOnce == false)
             frameScanOnce = true;
-            posMatchNum = 1;
+            
+            %for conveyor camera (get one frame)
+            %cImage = MTRN4230_Image_Capture([],[]); 
+            %cImage = imcrop(cImage,[515.0,4.50,676.00,720.00]);
+            
+            [cBboxes,~,cLabels] = detect(detector_updated_FINAL,cImage,'Threshold',0.30,...
+                    'NumStrongestRegions',10);
+            posMatchNum = 0;
             for posMatch = 1 : size(shape_color,2)
                 [check,~] = shapeCheck(uint8(cLabels),shape_color(1,posMatch));
                 if (check == true)
@@ -329,16 +339,15 @@ while (foundAllBlocks ~= true)
 
                 % 2. Check if the matched shape is in right color
                 tempCtr = 0;                 
-                hsv_pathC = rgb2hsv(cImage);
-
-                % Create mask to find pixels with desired HSV ranges (binary mask) -
+                
+                % Create mask to find pixels with desired RGB ranges (binary mask) -
                 % from customer image results
                 csv_encoding = shape_color(2,j);
-                [color_hsv_hi,color_hsv_low] = HSV_IteratorC(csv_encoding);               
+                [color_rgb_hi,color_rgb_low] = RGB_IteratorC(csv_encoding);               
 
-                mask_desiredC = (hsv_pathC(:,:,1) >= color_hsv_low(1)) & (hsv_pathC(:,:,1) <= color_hsv_hi(1)) & ...
-                        (hsv_pathC(:,:,2) >= color_hsv_low(2) ) & (hsv_pathC(:,:,2) <= color_hsv_hi(2)) & ...
-                        (hsv_pathC(:,:,3) >= color_hsv_low(3) ) & (hsv_pathC(:,:,3) <= color_hsv_hi(3));
+                mask_desiredC = (cImage(:,:,1) >= color_rgb_low(1)) & (cImage(:,:,1) <= color_rgb_hi(1)) & ...
+                        (cImage(:,:,2) >= color_rgb_low(2) ) & (cImage(:,:,2) <= color_rgb_hi(2)) & ...
+                        (cImage(:,:,3) >= color_rgb_low(3) ) & (cImage(:,:,3) <= color_rgb_hi(3));
 
                 statsC = regionprops(mask_desiredC,'basic');
                 Ccentroids = cat(1,statsC.Centroid);
@@ -419,8 +428,8 @@ while (foundAllBlocks ~= true)
                     correctColor = false; % reset flag                        
 
                     % If all required blocks are found
-                    missingBlocks = find(shape_color(1,:) ~= 0);
-                    if (conv_match_ctr == missingBlocks)
+                    conveyFound = find(shape_color(1,:) ~= 0);
+                    if (conv_match_ctr == conveyFound)
                         foundAllBlocks = true;
                         fprintf('~~~ALL %d BLOCKS FOUND AND PLACED ON CAKE~~'...
                             ,conv_match_ctr);
@@ -437,18 +446,35 @@ while (foundAllBlocks ~= true)
                     shape_color(1,j) = -1;                                
                     check = false; % reset current T/F detection
                     correctShape = false;
-                    conv_match_ctr = conv_match_ctr + 1; % max number of blocks
+                    conv_match_ctr = conv_match_ctr + 1; % increase no. successful
+                    % block matches
+                    
+                    % Not all required blocks are on conveyor
+                    if(pulseCounter > 4)
+                        disp('NEED more Blocks');
+                        pause(5.0);
+                    end
+                    
                     %close;
+                    
                 else
 
                     % If NOT, see if there were any other detected objects
                     % in same frame
-                    disp('Checking Similar Shapes?');
+                    disp('KEEP FRAME')
                     shape_color(1,j) = -1;
                     correctShape = false;
                     
+                    % disable next pulse
+                    % do not scan again (still same frame)
+                    nextPulse = false;
+                    frameScanOnce = true;
+                    
                     if (posMatchNum == 0)
-                        nextPulse = false; % do not move conveyor if more shapes to check
+                        % enable next pulse
+                        % scan frame
+                        nextPulse = true;
+                        frameScanOnce = false;
                     end
                     
                     %close;
@@ -591,27 +617,27 @@ function block_angle = checkBlockOrientation(block_image)
     
 end
 
-% HSV at Conveyor
-function [color_hsv_hi,color_hsv_low] = HSV_IteratorC(counter)
+% RGB at Conveyor
+function [color_rgb_hi,color_rgb_low] = RGB_IteratorC(counter)
     if (counter == 1)
-        % Threshold for HSV - RED
-        color_hsv_low = [0.90,0.405,0.100];
-        color_hsv_hi = [0.980,1.00,0.900];
+        % Threshold for RGB - RED
+        color_rgb_low = [96,0,0];
+        color_rgb_hi = [255,70,70];
     end
     if (counter == 2)
-        % Threshold for HSV - GREEN
-        color_hsv_low = [0.180,0.300,0.010];
-        color_hsv_hi = [0.430,0.700,0.620];
+        % Threshold for RGB - GREEN
+        color_rgb_low = [0,0,0];
+        color_rgb_hi = [45,255,131];
     end
     if (counter == 3)
-        % Threshold for HSV - BLUE
-        color_hsv_low = [0.542,0.290,0.00];
-        color_hsv_hi = [0.701,1.00,0.807];        
+        % Threshold for RGB - BLUE
+        color_rgb_low = [0,0,150];
+        color_rgb_hi = [130,171,255];        
     end
     if (counter == 4)
-        % Threshold for HSV - YELLOW
-        color_hsv_low = [0.10,0.500,0.152];
-        color_hsv_hi = [0.230,0.800, 0.850];
+        % Threshold for RGB - YELLOW
+        color_rgb_low = [0,147,0];
+        color_rgb_hi = [255,255,86];
     end
 end
 
