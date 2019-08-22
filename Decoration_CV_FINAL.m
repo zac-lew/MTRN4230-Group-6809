@@ -8,6 +8,12 @@ global detector_updated_FINAL;
 global socket;
 global bdim;
 
+% Need to have the following files in the current
+% working directory:
+%1. FINAL_FRCNN_V5.mat
+%2. CalibConv.mat
+%3. CalibTable.mat
+
 load('FINAL_FRCNN_V5.mat');
 
 % 1. Set up TCP Connection
@@ -19,20 +25,20 @@ socket = openConnection(robot_IP_address,robot_port);
 
 % 2. Obtain Customer Image at Robot Cell
 
-useRobotCellCamera = false;
+useRobotCellCamera = true;
 if (~useRobotCellCamera)
     disp('---USING ROBOT CELL CAMERA---');      
     customerImage = imread('.\YOLO_TEST\Test2.jpg'); 
 else
+    %for robot cell (GUI). Returns raw image from robot cell camera
     disp('---USING ROBOT CELL CAMERA---');      
-    customerImage = MTRN4230_Image_Capture([]); %for robot cell (GUI)
+    customerImage = MTRN4230_Image_Capture([]); 
 end
 
 % 3. Analyse Customer Image
 
-useRobotCellCamera = false; % change if using robot cell camera
 ML_threshold = 0.20; % for Shape Detection
-min_block_size = 350; %for Color Filtering
+min_block_size = 375; %for Color Filtering (minimum blob area)
 
 [numBlocks,shape_color] = analyseCustomerImage(customerImage,ML_threshold,min_block_size);
 isp('Obtained PLACE Coordinates');
@@ -68,7 +74,7 @@ while (foundAllBlocks ~= true)
     cImage = MTRN4230_Image_Capture([],[]); 
     cImage = imcrop(cImage,[515.0,4.50,676.00,720.00]);
 
-    [cBboxes,~,cLabels] = detect(detector_updated_FINAL,cImage,'Threshold',0.30,...
+    [cBboxes,~,cLabels] = detect(detector_updated_FINAL,cImage,'Threshold',0.20,...
             'NumStrongestRegions',10);
 
     posMatchNum = 0;
@@ -101,7 +107,7 @@ while (foundAllBlocks ~= true)
              % if anyShape is still false after all labels
              if (anyShape == false)
                  noShape = true;
-                 break;
+                 break; % activate conveyor to move to next set of blocks
              end 
             
             % Found one of the potential matching shapes
