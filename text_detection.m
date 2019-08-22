@@ -1,11 +1,27 @@
 function [paths, stroke_im, n_blobs] = text_detection(img)
-    %img = iread('../w8-photos/table (4).jpg');
+    debug = 0;
+    
+    if debug == 1
+        th_img = iread('../w8-photos/table (4).jpg');
+        img = iread('../w8-photos/table (5).jpg');
+        [th_grid_th, grid_offset] = getGridRoi(im2double(rgb2gray(th_img)));
+        th_blobs = getBlobs(th_grid_th);
+        [t_ind, t_perim, t_area, t_pa, t_ap] = findThickBlobs(th_blobs, th_grid_th);
+    end
     addpath('export-fig\'); % need export-fig to export blob stroke plot
     grey = im2double(rgb2gray(img));
-    %grey = im2double(grey); % normalises greyscale to [0,1] range
     [grid_th, grid_offset] = getGridRoi(grey);
+
     blobs = getBlobs(grid_th);
-    %triple_pts = getTriplePoints(grey, grid_th, blobs);
+    %thick_ind = findThickBlobs(blobs, grid_th);
+    [ind, perim, area, pa, ap] = findThickBlobs(blobs, grid_th);
+
+    %thick_ind = findThickBlobs(blobs, grid_th);
+
+    paths = 1; stroke_im = 1; n_blobs = 1;
+    return; 
+    
+    triple_pts = getTriplePoints(grey, grid_th, blobs);
 
     n_blobs = size(blobs,2);
     %fh1 = figure; idisp(grid_th); hold on;
@@ -24,6 +40,20 @@ function [paths, stroke_im, n_blobs] = text_detection(img)
     %title(sprintf('num blobs = %d', lengt(blobs)));
     %blobs.plot_box; 
     %blob_img = 1;
+end
+
+function [thick_ind, perimeter, area, pa_ratio, ap_ratio] = findThickBlobs(blobs, grid_th)
+    perimeter = blobs.perimeter;
+    area = blobs.area;
+    pa_ratio = perimeter ./ area;
+    ap_ratio = area ./ perimeter; 
+    thick_ind = pa_ratio < 0.1838;
+    thin_ind = (pa_ratio < 0.1838) & (pa_ratio > 0.1722) & (perimeter < 237); 
+    thick_ind(thin_ind) = 0;
+    
+    figure; idisp(grid_th);
+    blobs(thick_ind).plot_box;    
+    pause;
 end
 
 function plotStrokesWithRobot(strokes_rob_frame, irb120)
@@ -214,7 +244,7 @@ function [strokes_grid_frame, stroke_im] = calculateStrokes(grid_th, blob)
     end
     
     % plot the path
-    figure; imshow(blob_im); hold on;
+    fh = figure; imshow(blob_im); hold on;
     tp_offset = [blob.umin; blob.vmin] + [-2; -2];
     strokes = deleteUnusedStrokes(strokes, strokes_ind, max_strokes);
     strokes_grid_frame = changeStrokesFrame(strokes, strokes_ind, tp_offset);
@@ -237,6 +267,7 @@ function [strokes_grid_frame, stroke_im] = calculateStrokes(grid_th, blob)
     end
     
     stroke_im = export_fig();
+    %close(fh);    
 end
 
 function strokes = deleteUnusedStrokes(strokes, strokes_ind, max_strokes)
