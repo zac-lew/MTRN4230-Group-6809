@@ -8,22 +8,36 @@ global detector_updated_FINAL;
 global socket;
 global bdim;
 
-%load('FINAL_FRCNN_V5.mat');
+load('FINAL_FRCNN_V5.mat');
 
 % 1. Set up TCP Connection
 
 % The robot's IP address and listener port
 robot_IP_address = '192.168.125.1'; % Real robot ip address
 robot_port = 1025;
-%socket = openConnection(robot_IP_address,robot_port);
+socket = openConnection(robot_IP_address,robot_port);
 
-% 2. Analyse Customer Image
+% 2. Obtain Customer Image at Robot Cell
+
+useRobotCellCamera = false;
+if (~useRobotCellCamera)
+    disp('---USING ROBOT CELL CAMERA---');      
+    customerImage = imread('.\YOLO_TEST\Test2.jpg'); 
+else
+    disp('---USING ROBOT CELL CAMERA---');      
+    customerImage = MTRN4230_Image_Capture([]); %for robot cell (GUI)
+end
+
+% 3. Analyse Customer Image
 
 useRobotCellCamera = false; % change if using robot cell camera
-[numBlocks,shape_color] = analyseCustomerImage(useRobotCellCamera);
-disp('Obtained PLACE Coordinates');
+ML_threshold = 0.20; % for Shape Detection
+min_block_size = 350; %for Color Filtering
 
-% 3. Analyse Conveyor
+[numBlocks,shape_color] = analyseCustomerImage(customerImage,ML_threshold,min_block_size);
+isp('Obtained PLACE Coordinates');
+
+% 4. Analyse Conveyor
 disp('---USING CONVEYOR CAMERA---');      
 load('CalibConv.mat');
 
@@ -37,9 +51,9 @@ nextPulse = true;
 pulseCounter = 1;
 noShape = false;
 colFound = false;
-cImage = imread('.\YOLO_TEST\ConveyorImages\C38.jpg');
-cImage = imcrop(cImage,[515.0,4.50,676.00,720.00]);
-figure
+% cImage = imread('.\YOLO_TEST\ConveyorImages\C12.jpg');
+% cImage = imcrop(cImage,[515.0,4.50,676.00,720.00]);
+% figure
 
 while (foundAllBlocks ~= true)
 
@@ -51,8 +65,8 @@ while (foundAllBlocks ~= true)
     moveConveyor(true,true);
             
     %for conveyor camera (get one frame)
-    %cImage = MTRN4230_Image_Capture([],[]); 
-    %cImage = imcrop(cImage,[515.0,4.50,676.00,720.00]);
+    cImage = MTRN4230_Image_Capture([],[]); 
+    cImage = imcrop(cImage,[515.0,4.50,676.00,720.00]);
 
     [cBboxes,~,cLabels] = detect(detector_updated_FINAL,cImage,'Threshold',0.30,...
             'NumStrongestRegions',10);
@@ -226,7 +240,7 @@ while (foundAllBlocks ~= true)
             end
             
             if (posMatchNum == 0)
-               disp('Requires more Blocks!');
+               disp('Requires more Blocks, Move Conveyor!');
                pause(3.0);
                break;
            end
@@ -236,19 +250,11 @@ end
 disp('DONE DEMO of DECORATION');
 
 %% ~~~~~~~FUNCTIONS~~~~~~
-function [numBlocks,shape_color] = analyseCustomerImage(useRobotCellCamera)
+function [numBlocks,shape_color] = analyseCustomerImage(customerImage,ML_threshold,min_block_size)
 
     global detector_updated_FINAL;
     load('CalibTable.mat');
-    if (~useRobotCellCamera)
-        disp('---USING ROBOT CELL CAMERA---');      
-        customerImage = imread('.\YOLO_TEST\Test11.jpg'); 
-    else
-        disp('---USING ROBOT CELL CAMERA---');      
-        customerImage = MTRN4230_Image_Capture([]); %for robot cell
-    end
-
-    %[a,b] = imcrop(customerImage);
+   
     rectROI = [560.51,290.51,477.98,485.98];
     ROI_image = imcrop(customerImage,rectROI); 
 
@@ -257,7 +263,6 @@ function [numBlocks,shape_color] = analyseCustomerImage(useRobotCellCamera)
     hold on
 
     % Detect Quirkle Blocks using ML detector
-    ML_threshold = 0.2;
     [bboxes,scores,labels] = detect(detector_updated_FINAL,ROI_image,'Threshold',...
         ML_threshold,'NumStrongestRegions',15);
 
@@ -337,8 +342,7 @@ function [numBlocks,shape_color] = analyseCustomerImage(useRobotCellCamera)
         centroids = cat(1,stats.Centroid);
 
         areas = cat(1,stats.Area); %(suitable area > 150)
-        [sort_area_m,sorted_area_row] = sort(areas,'descend'); 
-        min_block_size = 325;
+        [sort_area_m,sorted_area_row] = sort(areas,'descend');
         % Checking max number of items WITH a particular HSV filter
         for p = 1:filter_counter
 
@@ -346,8 +350,6 @@ function [numBlocks,shape_color] = analyseCustomerImage(useRobotCellCamera)
           % Error handling if no suitably sized object with color is present
 
             if (p > color_row)
-                continue;
-            elseif (block_counter > num_blocks)
                 continue;
             elseif (color_row < num_blocks && sort_area_m(p,1) < min_block_size)
                 continue;
@@ -381,12 +383,13 @@ function [numBlocks,shape_color] = analyseCustomerImage(useRobotCellCamera)
                cv_block_struct(2,check_ctr) = 0;
             end    
         end
-    end            
-
+    end
+    
     image_place_data = cv_block_struct; % Image coordinate frame
     colShapCheck = false;
     checkOnce = false;
     tempCheck = false;
+    colIncorrect = 0;
     for k = 1 : size(image_place_data,2)
         for centroidCheck = 1 : size(bboxes,1)
             colShapCheck = isInROI(bboxes(centroidCheck,:),image_place_data(1,k),...
@@ -400,11 +403,13 @@ function [numBlocks,shape_color] = analyseCustomerImage(useRobotCellCamera)
         end
         tempCheck = false;
     end
-
-    % Removing any missing centroids before color_shape match
-    image_place_data(:,colIncorrect) = 0;
-    image_place_data( :, ~any(image_place_data,1) ) = [];  %columns
-
+    
+    if (colIncorrect ~= 0)
+        % Removing any missing centroids before color_shape match
+        %image_place_data(:,colIncorrect) = 0;
+        %image_place_data( :, ~any(image_place_data,1) ) = [];  %columns
+    end
+    
     pick_counter = 1;
     j = 1;
     missingCentroid = false;
@@ -508,14 +513,14 @@ function moveConveyor(direction,enable)
     if (enable)
         if (direction) %direction = true (forward towards robot)
             %fwrite command for direction
-            %fwrite(socket,'C03');
+            fwrite(socket,'C03');
             pause(0.75);
-            %fwrite(socket,'C04');
+            fwrite(socket,'C04');
         else %direction = false (backward away from robot)
             %fwrite command for direction
-            %fwrite(socket,'C03');
+            fwrite(socket,'C03');
             pause(0.75);
-            %fwrite(socket,'C04');
+            fwrite(socket,'C04');
         end
     end
 end
@@ -534,28 +539,28 @@ function blockInfo = sendPnP(dataV)
     blockInfo = join(stringBlock,",");
     blockInfo = strcat(startBracket,blockInfo,endBracket);
     
-%     fwrite(socket, blockInfo); % 1x5 array for pick and place shape blocks
-%     str = fgetl(socket);
-%     fprintf(char(str));
-%     disp("First send")
-%     i = 0;
-%     while (~strcmp(str,"ACK"))
-%         i = i+1;
-%         fprintf("Looking for ACK: %d", i);
-%         fwrite(socket,blockInfo);
-%         str = fgetl(socket);
-%         fprintf("\n");
-%         fprintf(char(str));
-%     end
-%     i = 0;
-%     while (~strcmp(str,"DONE"))
-%         fprintf("Looking for DONE: %d", i);
-%         str = fgetl(socket);
-%         fprintf(char(str));
-%         fprintf("\n");
-%     end
-%     fprintf("\n");
-%     fprintf("Next block \n");
+    fwrite(socket, blockInfo); % 1x5 array for pick and place shape blocks
+    str = fgetl(socket);
+    fprintf(char(str));
+    disp("First send")
+    i = 0;
+    while (~strcmp(str,"ACK"))
+        i = i+1;
+        fprintf("Looking for ACK: %d", i);
+        fwrite(socket,blockInfo);
+        str = fgetl(socket);
+        fprintf("\n");
+        fprintf(char(str));
+    end
+    i = 0;
+    while (~strcmp(str,"DONE"))
+        fprintf("Looking for DONE: %d", i);
+        str = fgetl(socket);
+        fprintf(char(str));
+        fprintf("\n");
+    end
+    fprintf("\n");
+    fprintf("Next block \n");
 end
 
 % Check if any label from ML detector on live frame
