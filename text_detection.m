@@ -1,10 +1,10 @@
 function [paths, stroke_im, n_letters, letter_thickness] = text_detection(img)
-    debug = 0;
+    debug = 1;
     
     if debug == 1
         th_img = iread('../w8-photos/table (4).jpg');
-        %img = iread('../w8-photos/table (5).jpg');
-        img = iread('../cake-design-photos/table_img_07_16_15_50_39.jpg');
+        img = iread('../w8-photos/table q.jpg');
+        %img = iread('../cake-design-photos/table_img_07_16_15_50_39.jpg');
         [th_grid_th, grid_offset] = getGridRoi(im2double(rgb2gray(th_img)));
         th_blobs = getBlobs(th_grid_th);
         [thin_blob_ind, thick_blob_ind] = findThinThickBlobs(th_blobs, th_grid_th);
@@ -22,7 +22,7 @@ function [paths, stroke_im, n_letters, letter_thickness] = text_detection(img)
     triple_pts = getTriplePoints(grey, grid_th, blobs);
 
     n_letters = size(blobs,2);
-    %fh1 = figure; idisp(grid_th); hold on;
+    fh1 = figure; idisp(grid_th); hold on;
     load('irb120.mat');
     paths = cell(1, n_letters); 
     letter_thickness = cell(1, n_letters);
@@ -37,9 +37,9 @@ function [paths, stroke_im, n_letters, letter_thickness] = text_detection(img)
     end
     
     % plot the blobs
-    figure; imshow(grid_th);
+    %figure; imshow(grid_th);
     %title(sprintf('num blobs = %d', lengt(blobs)));
-    blobs(thin_blob_ind).plot_box; 
+    %blobs(thin_blob_ind).plot_box; 
     %blob_img = 1;
 end
 
@@ -248,7 +248,7 @@ function [strokes_grid_frame, stroke_im] = calculateStrokes(grid_th, blob)
                 % remove tp from search
                 [v, ind] = ismember(cur_pt, unexplored_tps);
                 
-                if ind(2) > 0 % hacky: need to fix
+                if ind(2) > 0 
                     unexplored_tps(:, ceil(ind(2)/2)) = [];
                     
                     % decrement n_unexplored tps
@@ -289,7 +289,7 @@ function [strokes_grid_frame, stroke_im] = calculateStrokes(grid_th, blob)
     end
     
     % plot the path
-    fh = figure; imshow(blob_im); hold on;
+    %fh = figure; imshow(blob_im); hold on; % todo uncomment
     tp_offset = [blob.umin; blob.vmin] + [-2; -2];
     strokes = deleteUnusedStrokes(strokes, strokes_ind, max_strokes);
     strokes_grid_frame = changeStrokesFrame(strokes, strokes_ind, tp_offset);
@@ -302,13 +302,13 @@ function [strokes_grid_frame, stroke_im] = calculateStrokes(grid_th, blob)
         %figure(1); hold on;
         %plot_point(strokes_grid_frame{i}(1:2,:), col2{i});
         
-        %plot(strokes_grid_frame{i}(1,:), strokes_grid_frame{i}(2,:),col{i});
-        %plot_point(strokes_grid_frame{i}(1:2,1), col3{i});
-        %plot_point(strokes_grid_frame{i}(1:2,end), col3{i+1});
+        plot(strokes_grid_frame{i}(1,:), strokes_grid_frame{i}(2,:),col{i});%, 'LineWidth', 1.5);
+        plot_point(strokes_grid_frame{i}(1:2,1), col3{i});%, 'LineWidth', 1.5);
+        plot_point(strokes_grid_frame{i}(1:2,end), col3{i+1});%, 'LineWidth', 1.5);
         
-        plot(strokes{i}(1,:), strokes{i}(2,:),col{i});
-        plot_point(strokes{i}(1:2,1), col3{i});
-        plot_point(strokes{i}(1:2,end), col3{i+1});
+        %plot(strokes{i}(1,:), strokes{i}(2,:),col{i});
+        %plot_point(strokes{i}(1:2,1), col3{i});
+        %plot_point(strokes{i}(1:2,end), col3{i+1});
     end
     
     stroke_im = export_fig();
@@ -404,6 +404,14 @@ function pt = getNextPt(cur_pt, prev_pt, skeleton)
    if abs(del(1)) <= 1 && abs(del(2)) <=1
        region_mid = [2; 2];
        region(del(2) + region_mid(2), del(1) + region_mid(1)) = 0;
+   end
+   
+   % also remove all points in the direction from which we came, when
+   % we came from either N, E, S or W. 
+   if abs(del(1)) <= 1 && abs(del(1)) > 0 && abs(del(2)) == 0
+       region(:, del(1) + region_mid(1)) = 0;
+   elseif abs(del(2)) <= 1 && abs(del(2)) > 0 && abs(del(1)) == 0
+       region(del(2) + region_mid(2), :) = 0;
    end
    
    masked_region = region .* ccw_mask; 

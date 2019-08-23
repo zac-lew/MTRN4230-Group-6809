@@ -3,7 +3,7 @@ function run_text_detection()
     %basename = '../w8-photos/'; 
     basename = '../cake-design-photos/';
     files = dir(strcat(basename, 'table*'));
-    files = flipud(files);
+    %files = flipud(files);
     
     for f = files'
        img = iread(strcat(basename, f.name));
