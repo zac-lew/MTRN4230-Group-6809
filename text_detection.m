@@ -1,4 +1,4 @@
-function [paths, stroke_im, n_blobs] = text_detection(img)
+function [paths, stroke_im, n_letters, letter_thickness] = text_detection(img)
     debug = 0;
     
     if debug == 1
@@ -17,18 +17,22 @@ function [paths, stroke_im, n_blobs] = text_detection(img)
 
     blobs = getBlobs(grid_th);
     [thin_blob_ind, thick_blob_ind] = findThinThickBlobs(blobs, grid_th);
+    %letter_thickness = findLetterThickness(blobs, grid_th);
 
     triple_pts = getTriplePoints(grey, grid_th, blobs);
 
-    n_blobs = size(blobs,2);
+    n_letters = size(blobs,2);
     %fh1 = figure; idisp(grid_th); hold on;
     load('irb120.mat');
-    paths = cell(1, n_blobs); 
-    stroke_im = cell(1, n_blobs); 
+    paths = cell(1, n_letters); 
+    letter_thickness = cell(1, n_letters);
+    stroke_im = cell(1, n_letters); 
 
-    for i = 1:n_blobs
+    for i = 1:n_letters
        [strokes_grid_frame, stroke_im{i}] = calculateStrokes(grid_th, blobs(i));
        paths{i} = strokesToRobFrame(strokes_grid_frame, grid_offset);
+       letter_thickness{i} = getLetterThickness(thin_blob_ind, ...
+           size(paths{i}, 2), i);
        %plotStrokesWithRobot(strokes_rob_frame, irb120);
     end
     
@@ -37,6 +41,14 @@ function [paths, stroke_im, n_blobs] = text_detection(img)
     %title(sprintf('num blobs = %d', lengt(blobs)));
     blobs(thin_blob_ind).plot_box; 
     %blob_img = 1;
+end
+
+function letter_thickness = getLetterThickness(thin_blob_ind, n_strokes, letter_ind)
+   letter_thickness = cell(1, n_strokes);
+   
+   for i = 1:n_strokes
+       letter_thickness{i} = thin_blob_ind(letter_ind);
+   end
 end
 
 function [thin_blob_ind, thick_blob_ind] = findThinThickBlobs(blobs, grid_th)

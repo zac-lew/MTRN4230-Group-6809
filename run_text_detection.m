@@ -7,7 +7,7 @@ function run_text_detection()
     
     for f = files'
        img = iread(strcat(basename, f.name));
-       [blob_paths, blob_im, n_blobs] = text_detection(img);
+       [blob_paths, blob_im, n_letters, letter_thickness] = text_detection(img);
        pause;
        close all;
     end
