@@ -3,24 +3,21 @@ function [paths, stroke_im, n_blobs] = text_detection(img)
     
     if debug == 1
         th_img = iread('../w8-photos/table (4).jpg');
-        img = iread('../w8-photos/table (5).jpg');
+        %img = iread('../w8-photos/table (5).jpg');
+        img = iread('../cake-design-photos/table_img_07_16_15_50_39.jpg');
         [th_grid_th, grid_offset] = getGridRoi(im2double(rgb2gray(th_img)));
         th_blobs = getBlobs(th_grid_th);
-        [t_ind, t_perim, t_area, t_pa, t_ap] = findThickBlobs(th_blobs, th_grid_th);
+        [thin_blob_ind, thick_blob_ind] = findThinThickBlobs(th_blobs, th_grid_th);
+        figure; idisp(th_grid_th); th_blobs(thick_blob_ind).plot_box;
     end
+    
     addpath('export-fig\'); % need export-fig to export blob stroke plot
     grey = im2double(rgb2gray(img));
     [grid_th, grid_offset] = getGridRoi(grey);
 
     blobs = getBlobs(grid_th);
-    %thick_ind = findThickBlobs(blobs, grid_th);
-    [ind, perim, area, pa, ap] = findThickBlobs(blobs, grid_th);
+    [thin_blob_ind, thick_blob_ind] = findThinThickBlobs(blobs, grid_th);
 
-    %thick_ind = findThickBlobs(blobs, grid_th);
-
-    paths = 1; stroke_im = 1; n_blobs = 1;
-    return; 
-    
     triple_pts = getTriplePoints(grey, grid_th, blobs);
 
     n_blobs = size(blobs,2);
@@ -36,24 +33,43 @@ function [paths, stroke_im, n_blobs] = text_detection(img)
     end
     
     % plot the blobs
-    %figure; imshow(grid_th);
+    figure; imshow(grid_th);
     %title(sprintf('num blobs = %d', lengt(blobs)));
-    %blobs.plot_box; 
+    blobs(thin_blob_ind).plot_box; 
     %blob_img = 1;
 end
 
-function [thick_ind, perimeter, area, pa_ratio, ap_ratio] = findThickBlobs(blobs, grid_th)
-    perimeter = blobs.perimeter;
-    area = blobs.area;
-    pa_ratio = perimeter ./ area;
-    ap_ratio = area ./ perimeter; 
-    thick_ind = pa_ratio < 0.1838;
-    thin_ind = (pa_ratio < 0.1838) & (pa_ratio > 0.1722) & (perimeter < 237); 
-    thick_ind(thin_ind) = 0;
+function [thin_blob_ind, thick_blob_ind] = findThinThickBlobs(blobs, grid_th)
+    thick_grid_th = erodeThinLetters(grid_th);
+    thick_blobs = getBlobs(thick_grid_th);   
     
-    figure; idisp(grid_th);
-    blobs(thick_ind).plot_box;    
-    pause;
+    n = size(blobs, 2);
+    n_th = size(thick_blobs, 2);
+    sig_dist = 3; % pixels
+    
+    if isempty(thick_blobs)
+       thick_blob_ind = logical(zeros(1, n)); 
+       thin_blob_ind = logical(ones(1, n));
+       return;
+    end    
+    
+    thick_blob_ind = zeros(1, n);
+
+    for i = 1:n
+        for j = 1:n_th
+            dist = distToPt(blobs(i).p, thick_blobs(j).p);
+            
+            if dist < sig_dist
+                thick_blob_ind(i) = 1;
+            end
+        end
+    end
+    
+    thick_blob_ind = logical(thick_blob_ind);
+    thin_blob_ind = logical(1 - thick_blob_ind);
+    
+%     figure; idisp(grid_th); blobs(thin_blob_ind).plot_box;
+%     pause;
 end
 
 function plotStrokesWithRobot(strokes_rob_frame, irb120)
@@ -79,12 +95,29 @@ function [grid_th, grid_offset] = getGridRoi(grey)
     grid_offset = [grid_roi_rect(1,1); grid_roi_rect(2,1)];
 end
 
+function im = erodeThinLetters(grid_th) 
+    im = idilate(grid_th, ones(5,5));
+end
+
 function blobs = getBlobs(grid_th)
     blobs = iblobs(grid_th, 'area', [520, 3450], 'boundary', ...
         'class', 0, 'aspect', [0.08,1]);
-    blobs(blobs.a < 40) = []; 
-    blobs(blobs.perimeter < 160) = [];
-    blobs(blobs.perimeter > 650) = [];
+    
+    if isempty(blobs)
+        return
+    end
+    
+    if ~isempty(find(blobs.a < 38, 1))
+        blobs(blobs.a < 38) = []; 
+    end
+    
+    if ~isempty(find(blobs.perimeter < 160, 1))
+        blobs(blobs.perimeter < 160) = [];
+    end
+    
+    if ~isempty(find(blobs.perimeter > 650, 1))
+        blobs(blobs.perimeter > 650) = [];
+    end    
     
     % bold letters: 
     % area: [1075, 3417] (other blobs can be included in this range => don't use to differentiate)

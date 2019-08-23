@@ -3,11 +3,12 @@ function run_text_detection()
     %basename = '../w8-photos/'; 
     basename = '../cake-design-photos/';
     files = dir(strcat(basename, 'table*'));
+    files = flipud(files);
     
     for f = files'
        img = iread(strcat(basename, f.name));
        [blob_paths, blob_im, n_blobs] = text_detection(img);
-       %pause;
+       pause;
        close all;
     end
     
