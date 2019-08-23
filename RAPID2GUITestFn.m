@@ -39,13 +39,12 @@ end
 
 while(isequal(get(socket_1, 'Status'), 'open'))
     app.ReadyforCustomerOrderLamp,Color = 'g';
-    uiwait(gcf); %Continues when figure is closed
+    %uiwait(gcf); %Continues when figure is closed
     app.PlacingLetterBlocksLamp.Color = 'g';
     app.TextArea.Value = 'Placing Chocolates';
     drawnow
 
     % --------------------------------CALL FUNCTIONS HERE----------------------------------
-
     MattCommTest_7Fn(app)
 
     app.CAKEREADYLamp.Color = 'g';

@@ -8,9 +8,9 @@ function MattCommTest_7Fn(app)
         if(isequal(get(socket_1, 'Status'), 'open'))
             %PickNPlace (commented out to save time)
             % Getting PnP data
-            customerImage = imread('PnpTestT2.jpg'); % Temporary
+            customerImage = imread('PnpTestT1.jpg'); % Temporary
             conv_match_ctr = 1;
-            shape_color = analyseCustomerImage(customerImage, 0.20, 375);
+            [numBlocks,shape_color] = analyseCustomerImage(customerImage, 0.20, 375);
             
             while(conv_match_ctr ~= size(shape_color,2))
                 [PnPMessage, shape_color, conv_match_ctr]  = Detection(conv_match_ctr, shape_color);

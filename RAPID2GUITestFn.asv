@@ -1,26 +1,29 @@
 clc; close all;
 
-% IMPORTS 
+%% IMPORTS 
 if( ~exist('detector_updated_FINAL','var')) load('FINAL_FRCNN_V5.mat'); end
-if( ~exist('R_Conv','var'))                 load('CalibConc.mat'); end
-if( ~exist('R_Table','var')) load('CalibTable.mat'); end
+if( ~exist('R_Conv','var'))                 load('CalibConv.mat'); end
+if( ~exist('R_Table','var'))                load('CalibTable.mat'); end
+global detector_updated_FINAL;
+global camParam_Conv R_Conv t_Conv;
+global camParam_Table R_Table t_Table;
 
-%start GUI
-app = BasicGUINewRev3();
-disp('GUI OPEN');
+%% CONNECTION
+global socket_1 socket_2;
 
-robot_IP_address = '127.0.0.1'; % Simulation ip address
-%robot_IP_address = '192.168.125.1';
-robot_port_1 = 1025;
-robot_port_2 = 1026;
-
-global socket_1;
-global socket_2;
+robot_IP_address = '127.0.0.1'; % Simulated
+%robot_IP_address = '192.168.125.1'; % Real
+robot_port_1 = 1025; robot_port_2 = 1026;
 
 socket_1 = Connect(robot_IP_address, robot_port_1);
 socket_2 = Connect(robot_IP_address, robot_port_2);
 set(socket_2, 'ReadAsyncMode', 'continuous');
 set(socket_2, 'BytesAvailableFcn', 'dispcallback');
+
+
+%% GUI
+app = BasicGUINewRev3();
+disp('GUI OPEN');
 
 if(~isequal(get(socket_1, 'Status'), 'open'))
         fopen(socket_1);
@@ -36,7 +39,7 @@ end
 
 while(isequal(get(socket_1, 'Status'), 'open'))
     app.ReadyforCustomerOrderLamp,Color = 'g';
-    uiwait(gcf); %Continues when figure is closed
+    %uiwait(gcf); %Continues when figure is closed
     app.PlacingLetterBlocksLamp.Color = 'g';
     app.TextArea.Value = 'Placing Chocolates';
     drawnow

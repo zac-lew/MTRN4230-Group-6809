@@ -1,5 +1,4 @@
 % CAKE - Computer Vision (Decoration)
-
 warning('off','all');
 clc;
 close all;
@@ -25,14 +24,14 @@ socket = openConnection(robot_IP_address,robot_port);
 
 % 2. Obtain Customer Image at Robot Cell
 
-useRobotCellCamera = true;
-if (~useRobotCellCamera)
-    disp('---USING ROBOT CELL CAMERA---');      
-    customerImage = imread('.\YOLO_TEST\Test2.jpg'); 
-else
+useRobotCellCamera = false;
+if (useRobotCellCamera)
     %for robot cell (GUI). Returns raw image from robot cell camera
     disp('---USING ROBOT CELL CAMERA---');      
     customerImage = MTRN4230_Image_Capture([]); 
+else
+    disp('---USING ROBOT CELL CAMERA---');      
+    customerImage = imread('PnpTestT2.jpg') ;
 end
 
 % 3. Analyse Customer Image
@@ -71,7 +70,11 @@ while (foundAllBlocks ~= true)
     moveConveyor(true,true);
             
     %for conveyor camera (get one frame)
-    cImage = MTRN4230_Image_Capture([],[]); 
+    if(useRobotCellCamera)
+        cImage = MTRN4230_Image_Capture([],[]); 
+    else
+        cImage = imread('PnPTestC2.jpg');
+    end
     cImage = imcrop(cImage,[515.0,4.50,676.00,720.00]);
 
     [cBboxes,~,cLabels] = detect(detector_updated_FINAL,cImage,'Threshold',0.20,...
