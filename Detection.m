@@ -5,16 +5,8 @@ function [guiString, shape_color, conv_match_ctr] = Detection(conv_match_ctr, sh
     global useRobotCellCamera;
     global camParam_Conv R_Conv t_Conv;
     
-    correctShape = false;
     correctColor = false;
-    foundAllBlocks = false;
-    checkMatch = false;
-    frameScanOnce = false;
-    nextPulse = true;
-    pulseCounter = 1;
-    noShape = false;
-    colFound = false;
-
+    
     %Xi,Yi,Xf,Yf,Angle_delta
     dataVector = zeros(1,5);
     
@@ -58,14 +50,12 @@ function [guiString, shape_color, conv_match_ctr] = Detection(conv_match_ctr, sh
          % no shape found in current frame
          % if anyShape is still false after all labels
          if (anyShape == false)
-             noShape = true;
              moveConveyor(true,true);
              break; % activate conveyor to move to next set of blocks
          end 
 
         % Found one of the potential matching shapes
         posMatchNum = posMatchNum - 1;
-        correctShape = true; 
 
         %disp('Shape Found!');                   
         % Annotate Shape detection result
@@ -74,9 +64,7 @@ function [guiString, shape_color, conv_match_ctr] = Detection(conv_match_ctr, sh
         rectangle('Position',[cBboxes(tempID,1),cBboxes(tempID,2),cBboxes(tempID,3),cBboxes(tempID,4)],'EdgeColor'...
             ,'g','LineWidth',2); 
 
-        % 2. Check if the matched shape is in right color
-        tempCtr = 0;                 
-
+        % 2. Check if the matched shape is in right color       
         % Create mask to find pixels with desired RGB ranges (binary mask) -
         % from customer image results
         csv_encoding = shape_color(2,tempJ);
@@ -90,31 +78,26 @@ function [guiString, shape_color, conv_match_ctr] = Detection(conv_match_ctr, sh
         Ccentroids = cat(1,statsC.Centroid);
         Careas = cat(1,statsC.Area); %(suitable area > 150)
         [sorted_area_C,sorted_area_rowC] = sort(Careas,'descend'); 
-
+        checkMatch = false;
         if (size(sorted_area_rowC,1) > 0)
-             % check labels detected at conveyor                    
-            while(colFound == false)
-                for ctr = 1 : size(shape_color,2)
-                    checkMatch = isInROI(cBboxes(tempID,:),Ccentroids(sorted_area_rowC(ctr),1),...
-                        Ccentroids(sorted_area_rowC(ctr),2));
-                    if (checkMatch == true && sorted_area_C(ctr) > 100)
-                        %which color was in BBox of correct shape
-                        tempCtr = checkMatch; 
-                        tempX = Ccentroids(sorted_area_rowC(ctr),1);
-                        tempY = Ccentroids(sorted_area_rowC(ctr),2);
-                        correctColor = true;
-                        %disp('Correct Color AND Correct Shape!');
-                        plot(tempX,tempY,'g*','LineWidth',2);
-                        checkMatch = false; % reset
-                        csv_encoding = 0; % reset csv encoding for next
-                        colFound = true; 
-                        break;
-                    end
-                end  
-            end                 
+            for ctr = 1 : size(shape_color,2)
+                checkMatch = isInROI(cBboxes(tempID,:),Ccentroids(sorted_area_rowC(ctr),1),...
+                    Ccentroids(sorted_area_rowC(ctr),2));
+                if (checkMatch == true && sorted_area_C(ctr) > 100)
+                    %which color was in BBox of correct shape
+                    tempCtr = checkMatch; 
+                    tempX = Ccentroids(sorted_area_rowC(ctr),1);
+                    tempY = Ccentroids(sorted_area_rowC(ctr),2);
+                    correctColor = true;
+                    disp('Correct Color AND Correct Shape!');
+                    plot(tempX,tempY,'g*','LineWidth',2);
+                    correctColor = true;
+                    break;
+                end
+            end 
         else
             correctColor = false;
-            %disp('Incorrect Color BUT Correct Shape!');
+            disp('Incorrect Color BUT Correct Shape!');
         end               
 
         if (correctColor == true)
@@ -160,7 +143,6 @@ function [guiString, shape_color, conv_match_ctr] = Detection(conv_match_ctr, sh
             guiString = sendPnP(dataVector); %array-string HERE                  
             fprintf('Sent %s to GUI!\n',guiString);
 
-            tempCtr = 0;
             % to scan for overall
             correctColor = false; % reset flag                        
 
@@ -189,10 +171,6 @@ function [guiString, shape_color, conv_match_ctr] = Detection(conv_match_ctr, sh
             disp('KEEP FRAME')                    
             % if only one of a shape
             shape_color(1,tempJ) = -1;
-            nextPulse = false;          
-            anyShape = false;    
-            correctShape = false;                        
-            %close;
         end
 
         if (posMatchNum == 0)
@@ -295,15 +273,11 @@ function colorName = whatColor(match_col)
 end
 
 function checkMatch = isInROI(ROI,x,y)
-   
     checkMatch = false;
-
     %ROI is (x,y,x_length,y_length)
     if ((x > ROI(1) && x < ROI(1) + ROI(3)) && (y > ROI(2) && y < ROI(2) + ROI(4)))
         checkMatch = true;
     end
-    
-    % else checkMatch remains false
 
 end
 

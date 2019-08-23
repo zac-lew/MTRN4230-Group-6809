@@ -151,10 +151,9 @@ function message = LookForMessage(socket,message)
     i = 0;
     str = "";
     while (~strcmp(str,message))
-        fprintf("Looking for %s: %d", message, i);
+        fprintf("Looking for %s: %d \n", message, i);
         str = fgetl(socket);
-        fprintf(char(str));
-        fprintf("\n");
+        fprintf("Saw: %s \n", char(str));
         i = i + 1;
     end
     return 

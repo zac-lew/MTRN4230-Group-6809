@@ -1,4 +1,4 @@
-function [finishPnP, shape_color, conv_match_ctr] = Detection(conv_match_ctr, shape_color)
+function [guiString, shape_color, conv_match_ctr] = Detection(conv_match_ctr, shape_color)
     % CAKE - Computer Vision (Decoration)
     global detector_updated_FINAL;
     global bdim;
@@ -17,7 +17,6 @@ function [finishPnP, shape_color, conv_match_ctr] = Detection(conv_match_ctr, sh
 
     %Xi,Yi,Xf,Yf,Angle_delta
     dataVector = zeros(1,5);
-
     
     % for each frame at a time
     while (true)
@@ -60,6 +59,7 @@ function [finishPnP, shape_color, conv_match_ctr] = Detection(conv_match_ctr, sh
          % if anyShape is still false after all labels
          if (anyShape == false)
              noShape = true;
+             moveConveyor(true,true);
              break; % activate conveyor to move to next set of blocks
          end 
 
@@ -92,26 +92,21 @@ function [finishPnP, shape_color, conv_match_ctr] = Detection(conv_match_ctr, sh
         [sorted_area_C,sorted_area_rowC] = sort(Careas,'descend'); 
 
         if (size(sorted_area_rowC,1) > 0)
-             % check labels detected at conveyor                    
-            while(colFound == false)
-                for ctr = 1 : size(shape_color,2)
-                    checkMatch = isInROI(cBboxes(tempID,:),Ccentroids(sorted_area_rowC(ctr),1),...
-                        Ccentroids(sorted_area_rowC(ctr),2));
-                    if (checkMatch == true && sorted_area_C(ctr) > 100)
-                        %which color was in BBox of correct shape
-                        tempCtr = checkMatch; 
-                        tempX = Ccentroids(sorted_area_rowC(ctr),1);
-                        tempY = Ccentroids(sorted_area_rowC(ctr),2);
-                        correctColor = true;
-                        %disp('Correct Color AND Correct Shape!');
-                        plot(tempX,tempY,'g*','LineWidth',2);
-                        checkMatch = false; % reset
-                        csv_encoding = 0; % reset csv encoding for next
-                        colFound = true; 
-                        break;
-                    end
-                end  
-            end                 
+            for ctr = 1 : size(shape_color,2)
+                checkMatch = isInROI(cBboxes(tempID,:),Ccentroids(sorted_area_rowC(ctr),1),...
+                    Ccentroids(sorted_area_rowC(ctr),2));
+                if (checkMatch == true && sorted_area_C(ctr) > 100)
+                    %which color was in BBox of correct shape
+                    tempCtr = checkMatch; 
+                    tempX = Ccentroids(sorted_area_rowC(ctr),1);
+                    tempY = Ccentroids(sorted_area_rowC(ctr),2);
+                    correctColor = true;
+                    disp('Correct Color AND Correct Shape!');
+                    plot(tempX,tempY,'g*','LineWidth',2);
+                    correctColor = true;
+                    break;
+                end
+            end 
         else
             correctColor = false;
             %disp('Incorrect Color BUT Correct Shape!');
@@ -166,12 +161,9 @@ function [finishPnP, shape_color, conv_match_ctr] = Detection(conv_match_ctr, sh
 
             % If all required blocks are found
             if (conv_match_ctr == size(shape_color,2))
-                foundAllBlocks = true;
                 fprintf('~~~ALL %d BLOCKS FOUND AND PLACED ON CAKE~~'...
                     ,conv_match_ctr);
-                % sendPnP sends '[0,0,0,0,0]'
-                doneAllBlocks = [0,0,0,0,0];
-                finishPnP = sendPnP(doneAllBlocks); %array-string HERE                  
+                guiString = sendPnP([0,0,0,0,0]);             
                 fprintf('Sent %s to GUI!\n',finishPnP);
                 pause(2);
                 break;
@@ -232,40 +224,14 @@ end
 
 % Array to String for GUI
 function blockInfo = sendPnP(dataV)
-    global socket_1;
-
     %Make into string '[Xi,Yi,Xf,Yf,A]'
     %32.9119  532.4741  376.4049  141.8782   43.0000
-
     startBracket = '[';
     endBracket = ']';
     dataV =  fix(dataV);
     stringBlock = string(dataV);    
     blockInfo = join(stringBlock,",");
     blockInfo = strcat(startBracket,blockInfo,endBracket);
-    
-    fwrite(socket_1, blockInfo); % 1x5 array for pick and place shape blocks
-    str = fgetl(socket_1);
-    fprintf(char(str));
-    disp("First send")
-    i = 0;
-    while (~strcmp(str,"ACK"))
-        i = i+1;
-        fprintf("Looking for ACK: %d", i);
-        fwrite(socket_1,blockInfo);
-        str = fgetl(socket_1);
-        fprintf("\n");
-        fprintf(char(str));
-    end
-    i = 0;
-    while (~strcmp(str,"DONE"))
-        fprintf("Looking for DONE: %d", i);
-        str = fgetl(socket_1);
-        fprintf(char(str));
-        fprintf("\n");
-    end
-    fprintf("\n");
-    fprintf("Next block \n");
 end
 
 % Check if any label from ML detector on live frame
@@ -324,15 +290,11 @@ function colorName = whatColor(match_col)
 end
 
 function checkMatch = isInROI(ROI,x,y)
-   
     checkMatch = false;
-
     %ROI is (x,y,x_length,y_length)
     if ((x > ROI(1) && x < ROI(1) + ROI(3)) && (y > ROI(2) && y < ROI(2) + ROI(4)))
         checkMatch = true;
     end
-    
-    % else checkMatch remains false
 
 end
 

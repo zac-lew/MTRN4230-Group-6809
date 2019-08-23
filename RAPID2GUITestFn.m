@@ -78,7 +78,6 @@ end
 
 %% Functions
 
-
 function socket = Connect(robot_IP_address, robot_port)
     socket = tcpip(robot_IP_address, robot_port);    
     fclose(socket);
@@ -234,6 +233,7 @@ function Str2GUI(app,str)
             drawnow             
     end        
 end
+
 function SwitchCommand(Switch,socket,state1,command0,command1)   
     if(strcmp(Switch,state1))
         fwrite(socket,command1);
