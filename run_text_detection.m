@@ -1,7 +1,7 @@
 function run_text_detection()
     close all; 
-    %basename = '../w8-photos/'; 
-    basename = '../cake-design-photos/';
+    basename = '../w8-photos/'; 
+    %basename = '../cake-design-photos/';
     files = dir(strcat(basename, 'table*'));
     %files = flipud(files);
     
@@ -15,7 +15,7 @@ function run_text_detection()
     %img = iread('../w8-photos/table (7).jpg');
     %[blob_paths, blob_im, n_blobs] = text_detection(img);
     
-    for i = 1:n_blobs
+    for i = 1:n_letters
         n_strokes = size(blob_paths{i}, 2);
         
         % iterate through all the strokes for this blob

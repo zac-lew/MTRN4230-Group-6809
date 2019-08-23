@@ -1,5 +1,5 @@
 function [paths, stroke_im, n_letters, letter_thickness] = text_detection(img)
-    debug = 1;
+    debug = 0;
     
     if debug == 1
         th_img = iread('../w8-photos/table (4).jpg');
@@ -19,17 +19,17 @@ function [paths, stroke_im, n_letters, letter_thickness] = text_detection(img)
     [thin_blob_ind, thick_blob_ind] = findThinThickBlobs(blobs, grid_th);
     %letter_thickness = findLetterThickness(blobs, grid_th);
 
-    triple_pts = getTriplePoints(grey, grid_th, blobs);
+    %triple_pts = getTriplePoints(grey, grid_th, blobs);
 
     n_letters = size(blobs,2);
-    fh1 = figure; idisp(grid_th); hold on;
+    grid_fh = figure; idisp(grid_th); hold on;
     load('irb120.mat');
     paths = cell(1, n_letters); 
     letter_thickness = cell(1, n_letters);
     stroke_im = cell(1, n_letters); 
 
     for i = 1:n_letters
-       [strokes_grid_frame, stroke_im{i}] = calculateStrokes(grid_th, blobs(i));
+       [strokes_grid_frame, stroke_im{i}] = calculateStrokes(grid_th, blobs(i), grid_fh);
        paths{i} = strokesToRobFrame(strokes_grid_frame, grid_offset);
        letter_thickness{i} = getLetterThickness(thin_blob_ind, ...
            size(paths{i}, 2), i);
@@ -79,9 +79,6 @@ function [thin_blob_ind, thick_blob_ind] = findThinThickBlobs(blobs, grid_th)
     
     thick_blob_ind = logical(thick_blob_ind);
     thin_blob_ind = logical(1 - thick_blob_ind);
-    
-%     figure; idisp(grid_th); blobs(thin_blob_ind).plot_box;
-%     pause;
 end
 
 function plotStrokesWithRobot(strokes_rob_frame, irb120)
@@ -101,6 +98,7 @@ end
 function [grid_th, grid_offset] = getGridRoi(grey)
     % grid_roi_rect = [470,1112;346,703]; % found with iroi
     grid_roi_rect = [418,1182;285,789]; % covers all grid squares, including side ones
+    %grid_roi_rect = [542,1055;278,791]; % covers only middle grid squares
     th = otsu(grey);
     grey_th = (grey >= th); 
     grid_th = iroi(grey_th, grid_roi_rect);
@@ -187,7 +185,7 @@ end
 % Calculates the strokes of the letter. A stroke is the part of the letter
 % the end-effector can complete in one motion without going back over
 % already-placed ink. Each letter is made up of one or more strokes. 
-function [strokes_grid_frame, stroke_im] = calculateStrokes(grid_th, blob)
+function [strokes_grid_frame, stroke_im] = calculateStrokes(grid_th, blob, grid_fh)
     %close all;
     end_pt_th = 15;
     max_strokes = 20;
@@ -289,30 +287,35 @@ function [strokes_grid_frame, stroke_im] = calculateStrokes(grid_th, blob)
     end
     
     % plot the path
-    %fh = figure; imshow(blob_im); hold on; % todo uncomment
+    
     tp_offset = [blob.umin; blob.vmin] + [-2; -2];
     strokes = deleteUnusedStrokes(strokes, strokes_ind, max_strokes);
     strokes_grid_frame = changeStrokesFrame(strokes, strokes_ind, tp_offset);
     
     col = {'w-', 'r-', 'g-', 'y-', 'c-', 'm-', 'b-'};
-    col2 = {'wo', 'ro', 'go', 'yo', 'co', 'mo', 'bo'};
+    %col = {'wo', 'ro', 'go', 'yo', 'co', 'mo', 'bo'};
     col3 = {'w+', 'r+', 'g+', 'y+', 'c+', 'm+', 'b+'};
+    
+    letter_fh = figure;
+    imshow(blob_im); hold on;
     
     for i = 1:strokes_ind-1
         %figure(1); hold on;
         %plot_point(strokes_grid_frame{i}(1:2,:), col2{i});
         
+        figure(grid_fh);
         plot(strokes_grid_frame{i}(1,:), strokes_grid_frame{i}(2,:),col{i});%, 'LineWidth', 1.5);
         plot_point(strokes_grid_frame{i}(1:2,1), col3{i});%, 'LineWidth', 1.5);
         plot_point(strokes_grid_frame{i}(1:2,end), col3{i+1});%, 'LineWidth', 1.5);
         
-        %plot(strokes{i}(1,:), strokes{i}(2,:),col{i});
-        %plot_point(strokes{i}(1:2,1), col3{i});
-        %plot_point(strokes{i}(1:2,end), col3{i+1});
+        figure(letter_fh);
+        plot(strokes{i}(1,:), strokes{i}(2,:),col{i});
+        plot_point(strokes{i}(1:2,1), col3{i});
+        plot_point(strokes{i}(1:2,end), col3{i+1});
     end
     
-    stroke_im = export_fig();
-    %close(fh);    
+    stroke_im = export_fig(letter_fh);
+    close(letter_fh);    
 end
 
 function strokes = deleteUnusedStrokes(strokes, strokes_ind, max_strokes)
@@ -356,7 +359,17 @@ function [strk_ind, strokes_ind, strokes, strk] = flushStroke(strokes_ind, strk_
         return;
     end
     
-    strokes{strokes_ind} = strk(:, 1:strk_ind - 1);
+    simplify = 1;
+    
+    if simplify
+        % simplify the stroke with the Douglas Peucker algorithm
+        addpath('douglas-peucker\'); % for line simplification
+        simple_strk = DouglasPeucker(strk(1:2, 1:strk_ind - 1), 1);
+        strokes{strokes_ind} = simple_strk';
+    else
+        strokes{strokes_ind} = strk(:, 1:strk_ind - 1); 
+    end
+        
     strk_ind = 1;
     strokes_ind = strokes_ind + 1;
     %strk = zeros(size(strk));
