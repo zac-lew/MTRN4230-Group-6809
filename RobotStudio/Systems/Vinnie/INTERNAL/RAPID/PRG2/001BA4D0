@@ -1,0 +1,5 @@
+MODULE DummyCOM
+    PROC Main()
+        TPWrite ".................";
+    ENDPROC
+ENDMODULE
