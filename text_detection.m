@@ -47,7 +47,7 @@ function letter_thickness = getLetterThickness(thin_blob_ind, n_strokes, letter_
    letter_thickness = cell(1, n_strokes);
    
    for i = 1:n_strokes
-       letter_thickness{i} = thin_blob_ind(letter_ind);
+       letter_thickness{i} = thin_blob_ind(letter_ind) * 1;
    end
 end
 
