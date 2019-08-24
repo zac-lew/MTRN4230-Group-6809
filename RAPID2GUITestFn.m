@@ -31,7 +31,7 @@ if(~isequal(get(socket_1, 'Status'), 'open'))
         app.TextArea.Value = 'Robot Connected SUCCESS';  
         app.ConnectionStatusLamp.Color = 'g';
 else
-        fprintf('Could not open TCP connection to %s on port %d\n',robot_IP_address, robot_port);
+        fprintf('Could not open TCP connection to %s on port %d\n',robot_IP_address, robot_port_1);
         app.TextArea.Value = 'Robot Connection FAILED';  
         app.ConnectionStatusLamp.Color = 'r';
         drawnow
@@ -45,7 +45,7 @@ while(isequal(get(socket_1, 'Status'), 'open'))
     drawnow
 
     % --------------------------------CALL FUNCTIONS HERE----------------------------------
-    MattCommTest_7Fn(app)
+    MattCommTest_7Fn(app,0) % Change number depending on what is run
 
     app.CAKEREADYLamp.Color = 'g';
     app.TextArea.Value = 'Cake Finished';

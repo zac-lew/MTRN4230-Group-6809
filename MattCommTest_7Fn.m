@@ -1,79 +1,86 @@
-function MattCommTest_7Fn(app)
+function MattCommTest_7Fn(app,runtype)
     global socket_1;
-    global socket_2;
-    %PnPArr = ["[-100,300,550,-20,45]"; "[-150,320,500,20,0]";];
+    %global socket_2;
     FinishedFlag = false;
+    % runtype = 0(pnp then ink), 1 (pnp only), 2 (ink only), 3( conveyor
+    % on), 4 (conveyor off), 5 (Vac on), 6 (Vac off)
+    runtype = 0; % temporary
 
     while(~FinishedFlag)
         if(isequal(get(socket_1, 'Status'), 'open'))
-            %PickNPlace (commented out to save time)
-            % Getting PnP data
-            customerImage = imread('PnpTestT2.jpg'); % Temporary
-            conv_match_ctr = 1;
-            shape_color = analyseCustomerImage(customerImage, 0.20, 375);
             
-            while(conv_match_ctr ~= size(shape_color,2))
-                [PnPMessage, shape_color, conv_match_ctr]  = Detection(conv_match_ctr, shape_color);
-                SendMessage(socket_1,"PNP");              
-                %SendMessage(socket_1,PnPArr(n));
-                SendMessage(socket_1,PnPMessage);
-                LookForMessage(socket_1,"DONE");
-                fprintf("\n");
-                fprintf("Next block \n");
-                pause(1);
+            if((runtype == 0) || (runtype == 1))
+                %PickNPlace (commented out to save time)
+                % Getting PnP data
+                customerImage = imread('PnpTestT2.jpg'); % Temporary
+                conv_match_ctr = 1;
+                shape_color = analyseCustomerImage(customerImage, 0.20, 375);
+
+                while(conv_match_ctr ~= size(shape_color,2))
+                    [PnPMessage, shape_color, conv_match_ctr]  = Detection(conv_match_ctr, shape_color);
+                    SendMessage(socket_1,"PNP");              
+                    SendMessage(socket_1,PnPMessage);
+                    LookForMessage(socket_1,"DONE");
+                    fprintf("\n");
+                    fprintf("Next block \n");
+                    pause(1);
+                end
+                fprintf("Finished PNP! \n");
             end
-            fprintf("Finished PNP! \n");
 
             app.TextArea.Value = 'Close Popup to Ink Trace';
-            uiwait(gcf);
+            %uiwait(gcf);
             
             app.TracingoutEdibleInkTextLamp.Color = 'g';
             app.TextArea.Value = 'Ink Tracing...';
 
-            % Ink
-            fprintf("Starting Ink \n");
-            img = iread('table (8).jpg');
-            imshow(img)
-            [blob_paths, blob_im, n_letters, thickVector] = text_detection(img);
-            close all;
-            figure; axis equal;
-            for k=1:n_letters
-                blob_letter = blob_paths{k};
-                thickV = thickVector{k};
+            if((runtype == 0) || (runtype == 2))
+                % Ink
+                fprintf("Starting Ink \n");
+                img = iread('table (8).jpg');
+                imshow(img)
+                [blob_paths, blob_im, n_letters, thickVector] = text_detection(img);
+                close all;
+                figure; axis equal;
+                for k=1:n_letters
+                    blob_letter = blob_paths{k};
+                    thickV = thickVector{k};
 
-                for j=1:length(blob_letter)
+                    for j=1:length(blob_letter)
 
-                    SendMessage(socket_1,"INK");                    
-                    data = blob_letter{j};
-                    thickOrThin = thickV(j);
-                    initial = "[" + length(data) + "," + thickOrThin + "]"; 
-                    SendMessage(socket_1,initial);
+                        SendMessage(socket_1,"INK");                    
+                        data = blob_letter{j};
+                        thickOrThin = thickV(j);
+                        initial = "[" + length(data) + "," + thickOrThin + "]"; 
+                        SendMessage(socket_1,initial);
 
-                    %  send the whole array 
-                    for n=1:length(data)
-                        fprintf("Array no. %d of %d \n", n, length(data));
-                        send_str = "[" + num2str(data(n,1)*1000 ) + "," + num2str(data(n,2)*1000) + "]"; 
-                        SendMessage(socket_1,send_str);
-                        str = "";
+                        %  send the whole array 
+                        for n=1:length(data)
+                            fprintf("Array no. %d of %d \n", n, length(data));
+                            send_str = "[" + num2str(data(n,1)*1000 ) + "," + num2str(data(n,2)*1000) + "]"; 
+                            SendMessage(socket_1,send_str);
+                            str = "";
 
-                    if ( j == 1)
-                        hold off;
-                        subplot(n_letters,1,k);
-                    end 
-                    plot(data(:,1),data(:,2))
-                    hold on;
+                        if ( j == 1)
+                            hold off;
+                            subplot(n_letters,1,k);
+                        end 
+                        plot(data(:,1),data(:,2))
+                        hold on;
 
+                        end
+                        LookForMessage(socket_1,"DONE");
+                        fprintf("Finished INK! \n");
+                        pause(2.0);
                     end
-                    LookForMessage(socket_1,"DONE");
-                    fprintf("Finished INK! \n");
-                    pause(2.0);
                 end
             end
 
-
-            SendMessage(socket_1,"CON");% conveyor on
-            SendMessage(socket_1,"COF");% conveyor off
-            SendMessage(socket_1,"UPD");
+            if(runtype == 3) SendMessage(socket_1,"CON"); end
+            if(runtype == 4) SendMessage(socket_1,"COF"); end
+            if(runtype == 5) SendMessage(socket_1,"VON"); end
+            if(runtype == 6) SendMessage(socket_1,"VOF"); end
+            
             fprintf("Finished program! \n");
             FinishedFlag = true;
         else
