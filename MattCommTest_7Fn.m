@@ -14,23 +14,26 @@ function MattCommTest_7Fn(app,runtype)
 
     while(~FinishedFlag)
         if(isequal(get(socket_1, 'Status'), 'open'))
-            %PickNPlace (commented out to save time)
-            % Getting PnP data
-            customerImage = imread('PnpTestT2.jpg'); % Temporary
-            conv_match_ctr = 1;
-            [shape_color,missingBlockMatch] = analyseCustomerImage(customerImage,0.20,350);
             
-            while(conv_match_ctr ~= (size(shape_color,2) - missingBlockMatch))
-                [PnPMessage, shape_color, conv_match_ctr]  = Detection(conv_match_ctr, shape_color,275);
-                SendMessage(socket_1,"PNP");              
-                %SendMessage(socket_1,PnPArr(n));
-                SendMessage(socket_1,PnPMessage);
-                LookForMessage(socket_1,"DONE");
-                fprintf("\n");
-                fprintf("Next block \n");
-                pause(1);
-            end
+            if((runtype == 0) || (runtype == 1))
+                %PickNPlace (commented out to save time)
+                % Getting PnP data
+                customerImage = imread('PnpTestT2.jpg'); % Temporary
+                conv_match_ctr = 1;
+                [shape_color,missingBlockMatch] = analyseCustomerImage(customerImage,0.20,350);
 
+                while(conv_match_ctr ~= (size(shape_color,2) - missingBlockMatch))
+                    [PnPMessage, shape_color, conv_match_ctr]  = Detection(conv_match_ctr, shape_color,275);
+                    SendMessage(socket_1,"PNP");              
+                    %SendMessage(socket_1,PnPArr(n));
+                    SendMessage(socket_1,PnPMessage);
+                    LookForMessage(socket_1,"DONE");
+                    fprintf("\n");
+                    fprintf("Next block \n");
+                    pause(1);
+                end
+            end
+            
             app.TextArea.Value = 'Close Popup to Ink Trace';
             %uiwait(gcf);
             
