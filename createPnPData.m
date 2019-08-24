@@ -16,9 +16,9 @@ function guiString = createPnPData(tempJ,shape_color,X,Y,block_angleC)
     if (~canReach)
         disp('Not Reachable');
         % move conveyor back/forwards
-        if (dataVector(2) < 150) %TODO: Improve this if possible
+        if (dataVector(2) < -150) %TODO: Improve this if possible
             moveConveyor(true,true); %direction = true (forward towards robot)
-        else
+        elseif (dataVector(2) > -50)  
             moveConveyor(false,true); %direction = false (away from robot)
         end
     end
