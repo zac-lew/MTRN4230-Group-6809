@@ -70,6 +70,7 @@ function [guiString, shape_color, conv_match_ctr] = Detection(conv_match_ctr, sh
         
         % Found one of the potential matching shapes
         posMatchNum = posMatchNum - 1;
+        pause(1.0);
         
         % Annotate Shape detection result
         imshow(cImage);
@@ -85,9 +86,14 @@ function [guiString, shape_color, conv_match_ctr] = Detection(conv_match_ctr, sh
         if (correctColor == true)
             colFound = false;
             tempROI_imageC = cImage;
+            
+            %---increment number of successful block found---
+            conv_match_ctr = conv_match_ctr + 1;
+            %---increment number of successful block found---
+            
             fprintf('%d: %s %s FOUND\n',conv_match_ctr,whatColor(shape_color(2,tempJ)),cLabels(tempID));                            
             cLabels(tempID) = '';
-            
+
             % 3. Detected pose (match to customer's desired pose)
 
             %angle_roiC = [tempX-bdim/2,tempY-bdim/2,bdim,bdim];
@@ -104,18 +110,15 @@ function [guiString, shape_color, conv_match_ctr] = Detection(conv_match_ctr, sh
             check = false; % reset current T/F detection
             correctShape = false;
             correctColor = false; % reset flag
-            conv_match_ctr = conv_match_ctr + 1; 
-            scanOnce = true;
-            
-            % MAKE INTO FUNCTION
+           
+            % Keep current frame and do NOT move conveyor
             if (posMatchNum == 0)
                disp('Scan More Blocks, Move Conveyor!');
-               % Pulse conveyor along if no more potential blocks in 
-               % current frame (direction,enable)
                scanOnce = false;
-               pause(1.0);
-            end
-            
+               pause(1.0);            
+            else
+                scanOnce = true;
+            end                       
             break;
 
         else
@@ -133,6 +136,10 @@ function [guiString, shape_color, conv_match_ctr] = Detection(conv_match_ctr, sh
                         cImage,tempID,min_conveyor);       
                     if (correctColor)
                         
+                        %---increment number of successful block found---
+                        conv_match_ctr = conv_match_ctr + 1; 
+                        %---increment number of successful block found---
+                        
                         fprintf('%d: %s %s FOUND\n',conv_match_ctr,whatColor(shape_color(2,checkDuplicates(ix))),...
                             cLabels(tempID));                            
 
@@ -149,12 +156,21 @@ function [guiString, shape_color, conv_match_ctr] = Detection(conv_match_ctr, sh
                         check = false; % reset current T/F detection
                         correctShape = false;
                         correctColor = false; % reset flag
-                        cLabels(checkDuplicates(ix)) = '';
-                        conv_match_ctr = conv_match_ctr + 1; 
+                        cLabels(checkDuplicates(ix)) = '';                       
+                        
+                        % Keep current frame and do NOT move conveyor
+                        if (posMatchNum == 0)
+                           disp('Scan More Blocks, Move Conveyor!');
+                           scanOnce = false;
+                           pause(1.0);            
+                        else
+                            scanOnce = true;
+                        end                  
+            
                         break;
                     end
                 end            
-            scanOnce = true;
+            %scanOnce = true;
             end
         end
     end        
