@@ -19,7 +19,7 @@ function MattCommTest_7Fn(app,runtype)
                 %PickNPlace (commented out to save time)
                 % Getting PnP data
                 customerImage = imread('PnpTestT2.jpg'); % Temporary
-                conv_match_ctr = 1;
+                conv_match_ctr = 0;
                 [shape_color,missingBlockMatch] = analyseCustomerImage(customerImage,0.20,350);
 
                 while(conv_match_ctr ~= (size(shape_color,2) - missingBlockMatch))

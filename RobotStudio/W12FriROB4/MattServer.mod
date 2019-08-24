@@ -40,112 +40,123 @@ MODULE MattServer
     ENDPROC
 
     PROC WaitForMessage()
-            TPWrite ">>>>>>L>>>>>>  " + "In_str: " + In_str + "   Out_str: " + Out_str; 
-        
-            IF Out_str <> "0" THEN
-                SendOutStr;
-            ENDIF
-            
-            IF In_str = "0" THEN
-                GetInStr;
+		TPWrite ">>>>>>L>>>>>>  " + "In_str: " + In_str + "   Out_str: " + Out_str; 
+	
+		IF Out_str <> "0" THEN
+			SendOutStr;
+		ENDIF
+		
+		IF In_str = "0" THEN
+			GetInStr;
 
-                TEST In_str
-                CASE "PNP": ! Pick and Place
-                    SendACK;
-                    TPWrite "Read PNP";
-                    GetInStrACK;
-                    TPWrite "In_str: " + In_str;
-                    MattMain;
-                    
-                CASE "INK": ! Ink print
-                    SendACK;
-                    TPWrite "Read INK";
-                    DrawPt := Zeros500;
-                    inkData := [0,0];
-                    inkSize := 0;
-                    count := 1;
-                    
-                    In_str := "0";
-                    GetInStr;
-                    ok := StrToVal(In_str, inkData);
-                    inkSize := inkData{1};
-                    inkThick := inkData{2};
-                    
-                    WHILE inkSize <= 0 DO ! Should be skipped if obtained correctly
-                        FlushSocket;
-                        In_str := "0";
-                        GetInStr;
-                        ok := StrToVal(In_str, inkData);
-                        inkSize := inkData{1};
-                        inkThick := inkData{2};
-                    ENDWHILE
-                    SendACK;
-                    
-                    TPWrite "Size: " + ValToStr(inkSize) + " " + "thickThin: " + ValToStr(inkThick);
-                    
-                    ! Loading stroke data 
-                    WHILE count <= inkSize DO
-                        GetInStrACK;
-                        IF In_str <> "0" THEN     
-                            ok := StrToVal(In_str, inkData);    ! - feed values into array 
-                            !TPWrite "cnt: " + ValToStr(count) + ", Ink1: " + ValToStr(inkData{1}) + ", Ink2: " + ValToStr(inkData{2});
-                            DrawPt{count,1} := inkData{1};      ! - first value is number of points 
-                            DrawPt{count,2} := inkData{2};      ! - second value is thick or thin 
-                            count := count + 1;
-                            In_str := "0";
-                        ENDIF
-                    ENDWHILE
-                    
-                    ! Begin Ink tracing 
-                    IF inkSize > 0 THEN                        
-                        PrintLetter inkThick;
-                        TPWrite "Finished INK";
-                        Out_Str := "DONE";
-                        SendOutStr;
-                    ENDIF
-                       
-                
-                CASE "CON": ! Conveyor On
-                    SendACK;
-                    TPWrite "Read CON";
-                    In_Str := "0";
-                    TurnConOn;
-                    Out_Str := "DONE";
-                
-                CASE "COF": ! Conveyor Off
-                    SendACK;
-                    TPWrite "Read COF";
-                    In_Str := "0";
-                    TurnConOff;
-                    Out_Str := "DONE";
-                    
-                CASE "CFW": ! Conveyor Forward
-                    SendACK;
-                    TPWrite "Read CFW";
-                    In_Str := "0";
-                    ConForward;
-                    Out_Str := "DONE";
-                
-                CASE "CBK": ! Conveyor Backward
-                    SendACK;
-                    TPWrite "Read CBK";
-                    In_Str := "0";
-                    ConBackward;
-                    Out_Str := "DONE";
-                
-                CASE "UPD": ! Update
-                    SendACK;
-                    TPWrite "Read UPD";
-                    In_Str := "0";
-                    WaitTime(3.0); ! Not implemented yet
-                    Out_Str := "DONE";
-    
-                DEFAULT:
-                    FlushSocket;
-                    In_Str := "0";
-                    Out_Str := "0";
-                ENDTEST
-            ENDIF       
+			TEST In_str
+			CASE "PNP": ! Pick and Place
+				SendACK;
+				TPWrite "Read PNP";
+				GetInStrACK;
+				TPWrite "In_str: " + In_str;
+				MattMain;
+				
+			CASE "INK": ! Ink print
+				SendACK;
+				TPWrite "Read INK";
+				DrawPt := Zeros500;
+				inkData := [0,0];
+				inkSize := 0;
+				count := 1;
+				
+				In_str := "0";
+				GetInStr;
+				ok := StrToVal(In_str, inkData);
+				inkSize := inkData{1};
+				inkThick := inkData{2};
+				
+				WHILE inkSize <= 0 DO ! Should be skipped if obtained correctly
+					FlushSocket;
+					In_str := "0";
+					GetInStr;
+					ok := StrToVal(In_str, inkData);
+					inkSize := inkData{1};
+					inkThick := inkData{2};
+				ENDWHILE
+				SendACK;
+				
+				TPWrite "Size: " + ValToStr(inkSize) + " " + "thickThin: " + ValToStr(inkThick);
+				
+				! Loading stroke data 
+				WHILE count <= inkSize DO
+					GetInStrACK;
+					IF In_str <> "0" THEN     
+						ok := StrToVal(In_str, inkData);    ! - feed values into array 
+						!TPWrite "cnt: " + ValToStr(count) + ", Ink1: " + ValToStr(inkData{1}) + ", Ink2: " + ValToStr(inkData{2});
+						DrawPt{count,1} := inkData{1};      ! - first value is number of points 
+						DrawPt{count,2} := inkData{2};      ! - second value is thick or thin 
+						count := count + 1;
+						In_str := "0";
+					ENDIF
+				ENDWHILE
+				
+				! Begin Ink tracing 
+				IF inkSize > 0 THEN                        
+					PrintLetter inkThick;
+					TPWrite "Finished INK";
+					Out_Str := "DONE";
+					SendOutStr;
+				ENDIF
+				   
+			
+			CASE "CON": ! Conveyor On
+				SendACK;
+				TPWrite "Read CON";
+				In_Str := "0";
+				TurnConOn;
+				Out_Str := "DONE";
+			
+			CASE "COF": ! Conveyor Off
+				SendACK;
+				TPWrite "Read COF";
+				In_Str := "0";
+				TurnConOff;
+				Out_Str := "DONE";
+				
+			CASE "CFW": ! Conveyor Forward
+				SendACK;
+				TPWrite "Read CFW";
+				In_Str := "0";
+				ConForward;
+				Out_Str := "DONE";
+			
+			CASE "CBK": ! Conveyor Backward
+				SendACK;
+				TPWrite "Read CBK";
+				In_Str := "0";
+				ConBackward;
+				Out_Str := "DONE";
+			
+			CASE "UPD": ! Update
+				SendACK;
+				TPWrite "Read UPD";
+				In_Str := "0";
+				WaitTime(3.0); ! Not implemented yet
+				Out_Str := "DONE";
+
+			DEFAULT:
+				FlushSocket;
+				In_Str := "0";
+				Out_Str := "0";
+			ENDTEST
+		ENDIF       
+			
+		ERROR
+        IF ERRNO = ERR_SOCK_CLOSED THEN
+            SocketClose client_socket;
+            ListenForAndAcceptConnection;
+            RETRY;
+        ELSEIF ERRNO = ERR_SOCK_TIMEOUT THEN
+            SocketClose client_socket;
+            ListenForAndAcceptConnection;
+            RETRY;
+        ENDIF
     ENDPROC
     
     PROC GetInStrACK()
