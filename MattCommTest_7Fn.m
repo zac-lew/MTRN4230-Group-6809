@@ -1,6 +1,11 @@
 function MattCommTest_7Fn(app)
     global socket_1;
     global socket_2;
+    global scanOnce;
+    global cLabels cBboxes;
+    global posMatchNum;
+    global cImage;
+
     %PnPArr = ["[-100,300,550,-20,45]"; "[-150,320,500,20,0]";];
     FinishedFlag = false;
 
@@ -10,10 +15,10 @@ function MattCommTest_7Fn(app)
             % Getting PnP data
             customerImage = imread('PnpTestT2.jpg'); % Temporary
             conv_match_ctr = 1;
-            shape_color = analyseCustomerImage(customerImage, 0.20, 375);
+            [shape_color,missingBlockMatch] = analyseCustomerImage(customerImage,0.20,350);
             
-            while(conv_match_ctr ~= size(shape_color,2))
-                [PnPMessage, shape_color, conv_match_ctr]  = Detection(conv_match_ctr, shape_color);
+            while(conv_match_ctr ~= (size(shape_color,2) - missingBlockMatch))
+                [PnPMessage, shape_color, conv_match_ctr]  = Detection(conv_match_ctr, shape_color,275);
                 SendMessage(socket_1,"PNP");              
                 %SendMessage(socket_1,PnPArr(n));
                 SendMessage(socket_1,PnPMessage);
