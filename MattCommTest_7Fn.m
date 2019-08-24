@@ -1,6 +1,12 @@
 function MattCommTest_7Fn(app,runtype)
     global socket_1;
-    %global socket_2;
+    global socket_2;
+    global scanOnce;
+    global cLabels cBboxes;
+    global posMatchNum;
+    global cImage;
+
+    %PnPArr = ["[-100,300,550,-20,45]"; "[-150,320,500,20,0]";];
     FinishedFlag = false;
     % runtype = 0(pnp then ink), 1 (pnp only), 2 (ink only), 3( conveyor
     % on), 4 (conveyor off), 5 (Vac on), 6 (Vac off)
@@ -8,24 +14,21 @@ function MattCommTest_7Fn(app,runtype)
 
     while(~FinishedFlag)
         if(isequal(get(socket_1, 'Status'), 'open'))
+            %PickNPlace (commented out to save time)
+            % Getting PnP data
+            customerImage = imread('PnpTestT2.jpg'); % Temporary
+            conv_match_ctr = 1;
+            [shape_color,missingBlockMatch] = analyseCustomerImage(customerImage,0.20,350);
             
-            if((runtype == 0) || (runtype == 1))
-                %PickNPlace (commented out to save time)
-                % Getting PnP data
-                customerImage = imread('PnpTestT2.jpg'); % Temporary
-                conv_match_ctr = 1;
-                shape_color = analyseCustomerImage(customerImage, 0.20, 375);
-
-                while(conv_match_ctr ~= size(shape_color,2))
-                    [PnPMessage, shape_color, conv_match_ctr]  = Detection(conv_match_ctr, shape_color);
-                    SendMessage(socket_1,"PNP");              
-                    SendMessage(socket_1,PnPMessage);
-                    LookForMessage(socket_1,"DONE");
-                    fprintf("\n");
-                    fprintf("Next block \n");
-                    pause(1);
-                end
-                fprintf("Finished PNP! \n");
+            while(conv_match_ctr ~= (size(shape_color,2) - missingBlockMatch))
+                [PnPMessage, shape_color, conv_match_ctr]  = Detection(conv_match_ctr, shape_color,275);
+                SendMessage(socket_1,"PNP");              
+                %SendMessage(socket_1,PnPArr(n));
+                SendMessage(socket_1,PnPMessage);
+                LookForMessage(socket_1,"DONE");
+                fprintf("\n");
+                fprintf("Next block \n");
+                pause(1);
             end
 
             app.TextArea.Value = 'Close Popup to Ink Trace';

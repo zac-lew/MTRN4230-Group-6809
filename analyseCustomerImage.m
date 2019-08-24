@@ -1,4 +1,4 @@
-function shape_color = analyseCustomerImage(customerImage,ML_threshold,min_block_size)
+function [shape_color,missingBlockMatch] = analyseCustomerImage(customerImage,ML_threshold,min_block_size)
     global detector_updated_FINAL;
     global camParam_Table R_Table t_Table;
 
@@ -126,8 +126,7 @@ function shape_color = analyseCustomerImage(customerImage,ML_threshold,min_block
             D = sqrt((cv_block_struct(1,j) - cv_block_struct(1,check_ctr))^2 +...
                 (cv_block_struct(2,j) - cv_block_struct(2,check_ctr))^2);
             if (D < 10 && D > 0)
-               cv_block_struct(1,check_ctr) = 0;
-               cv_block_struct(2,check_ctr) = 0;
+               cv_block_struct(:,check_ctr) = 0;
             end    
         end
     end
@@ -249,7 +248,7 @@ function shape_color = analyseCustomerImage(customerImage,ML_threshold,min_block
             [559.51+shape_color(3,bCount),290.51+shape_color(4,bCount)]);
     end
     
-    numBlocks = size(shape_color,2);
+    missingBlockMatch = find(shape_color(1,:) == 0);
 end
 
 %% ~~~~~~~FUNCTIONS~~~~~~
