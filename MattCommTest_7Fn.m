@@ -5,7 +5,8 @@ function MattCommTest_7Fn(app,runtype)
     global cLabels cBboxes;
     global posMatchNum;
     global cImage;
-
+    
+    scanOnce = false;
     FinishedFlag = false;
     % runtype = 0(pnp then ink), 1 (pnp only), 2 (ink only), 3( conveyor
     % on), 4 (conveyor off), 5 (Vac on), 6 (Vac off)
@@ -23,7 +24,7 @@ function MattCommTest_7Fn(app,runtype)
 
                 while(conv_match_ctr ~= (size(shape_color,2) - missingBlockMatch))
                     [PnPMessage, shape_color, conv_match_ctr]  = Detection(conv_match_ctr, shape_color,275);
-                    if( length(PnPMessage) > 1)
+                    if( PnPMessage.strlength > 1)
                         SendMessage(socket_1,"PNP");              
                         SendMessage(socket_1,PnPMessage);
                         LookForMessage(socket_1,"DONE");
