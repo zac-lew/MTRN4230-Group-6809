@@ -13,7 +13,7 @@ function [guiString, shape_color, conv_match_ctr] = Detection(conv_match_ctr, sh
     
     %Xi,Yi,Xf,Yf,Angle_delta
     dataVector = zeros(1,5);
-    
+    guiString = "";
     % for each frame at a time
     while (true)
 
