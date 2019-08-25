@@ -7,6 +7,7 @@ function MattCommTest_7Fn(app,runtype)
     global cImage;
     
     scanOnce = false;
+    posMatchNum = 0;
     FinishedFlag = false;
     % runtype = 0(pnp then ink), 1 (pnp only), 2 (ink only), 3( conveyor
     % on), 4 (conveyor off), 5 (Vac on), 6 (Vac off)
