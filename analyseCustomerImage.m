@@ -217,7 +217,6 @@ function [shape_color,missingBlockMatch] = analyseCustomerImage(customerImage,ML
     % Image processing to determine orientation of blocks
     % Call function for each detected block in turn
 
-    bdim = 50;
     tempROI_image = ROI_image;
     for k = 1: size(shape_color,2)
 
@@ -227,13 +226,14 @@ function [shape_color,missingBlockMatch] = analyseCustomerImage(customerImage,ML
         if (shape_color(1,k) == 0 || shape_color(2,k) == 0)
             continue;
         end
-
+        block_dim = 52;
         % Make temp comparison image (for each block)    
-        angle_roi = [shape_color(3,k)-bdim/2,shape_color(4,k)-bdim/2,bdim,bdim];
+        angle_roi = [shape_color(3,k)-block_dim/2,shape_color(4,k)-block_dim/2,block_dim,block_dim];
         aligned_block = imcrop(tempROI_image,angle_roi); % CustomerImage remains as RGB for color detection
 
         % Call function to detect orientation
-        block_angle = checkBlockOrientation(aligned_block,1);        
+        block_angle = checkBlockOrientation(aligned_block,1);      
+        text(shape_color(3,k)-50,shape_color(4,k),num2str(block_angle),'FontSize',10,'Color','b','FontWeight','bold')
         shape_color(5,k) = round(block_angle);
         tempROI_image = ROI_image;
     end
@@ -248,5 +248,4 @@ function [shape_color,missingBlockMatch] = analyseCustomerImage(customerImage,ML
     end
     
     missingBlockMatch = find(shape_color(1,:) == 0);
-    missingBlockMatch = size(missingBlockMatch,2); %if more than one block missing
 end
