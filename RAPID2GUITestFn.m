@@ -11,8 +11,8 @@ global camParam_Table R_Table t_Table;
 %% CONNECTION
 global socket_1 socket_2;
 
-robot_IP_address = '127.0.0.1'; % Simulated
-%robot_IP_address = '192.168.125.1'; % Real
+robot_IP_address = '127.0.0.1';         % Simulated
+%robot_IP_address = '192.168.125.1';    % Real
 robot_port_1 = 1025; robot_port_2 = 1026;
 
 socket_1 = Connect(robot_IP_address, robot_port_1);
