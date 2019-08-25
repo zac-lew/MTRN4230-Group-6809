@@ -96,9 +96,9 @@ function [guiString, shape_color, conv_match_ctr] = Detection(conv_match_ctr, sh
 
             % 3. Detected pose (match to customer's desired pose)
 
-            %angle_roiC = [tempX-bdim/2,tempY-bdim/2,bdim,bdim];
-            %aligned_blockC = imcrop(tempROI_imageC,angle_roiC); % CustomerImage remains as RGB for color detection
-            block_angleC = 45.0; %checkBlockOrientation(aligned_blockC);
+            angle_roiC = [tempX-bdim/2,tempY-bdim/2,bdim,bdim];
+            aligned_blockC = imcrop(tempROI_imageC,angle_roiC); % CustomerImage remains as RGB for color detection
+            block_angleC = checkBlockOrientation(aligned_blockC);
 
             % 4. Send Data to Robot Arm
             guiString = createPnPData(tempJ,shape_color,tempX,tempY,block_angleC);    
@@ -143,10 +143,10 @@ function [guiString, shape_color, conv_match_ctr] = Detection(conv_match_ctr, sh
                         fprintf('%d: %s %s FOUND\n',conv_match_ctr,whatColor(shape_color(2,checkDuplicates(ix))),...
                             cLabels(tempID));                            
 
-                        %angle_roiC = [newX-bdim/2,newY-bdim/2,bdim,bdim];
-                        %tempROI_imageC = cImage;
-                        %aligned_blockC = imcrop(tempROI_imageC,angle_roiC); % CustomerImage remains as RGB for color detection
-                        block_angleC = 45.0; %checkBlockOrientation(aligned_blockC);
+                        angle_roiC = [newX-bdim/2,newY-bdim/2,bdim,bdim];
+                        tempROI_imageC = cImage;
+                        aligned_blockC = imcrop(tempROI_imageC,angle_roiC); % CustomerImage remains as RGB for color detection
+                        block_angleC = checkBlockOrientation(aligned_blockC);
                         
                         guiString = createPnPData(checkDuplicates(ix),shape_color,newX,newY,block_angleC);   
                          % If a block and color is successfully found, remove this
