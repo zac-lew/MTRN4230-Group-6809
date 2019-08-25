@@ -1,6 +1,7 @@
 function [shape_color,missingBlockMatch] = analyseCustomerImage(customerImage,ML_threshold,min_block_size)
     global detector_updated_FINAL;
     global camParam_Table R_Table t_Table;
+    global bdim;
 
     rectROI = [560.51,290.51,477.98,485.98];
     ROI_image = imcrop(customerImage,rectROI); 
@@ -233,8 +234,7 @@ function [shape_color,missingBlockMatch] = analyseCustomerImage(customerImage,ML
         aligned_block = imcrop(tempROI_image,angle_roi); % CustomerImage remains as RGB for color detection
 
         % Call function to detect orientation
-        % block_angle = checkBlockOrientation(aligned_block);
-        block_angle = 2.0;        
+        block_angle = checkBlockOrientation(aligned_block);        
         shape_color(5,k) = round(block_angle);
         tempROI_image = ROI_image;
     end
