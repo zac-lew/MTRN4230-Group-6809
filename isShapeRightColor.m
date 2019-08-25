@@ -15,9 +15,11 @@ function [correctColor,tempX,tempY] = isShapeRightColor(shape_color,tempJ,cBboxe
     Careas = cat(1,statsC.Area); %(suitable area > 150)
     [sorted_area_C,sorted_area_rowC] = sort(Careas,'descend'); 
     checkMatch = false;
+    missingBlockMatch = find(shape_color(1,:) == 0);
+    missingBlockMatch = size(missingBlockMatch,2);
     
     if (size(sorted_area_rowC,1) > 0)
-        for ctr = 1 : size(shape_color,2)
+        for ctr = 1 : size(shape_color,2) - missingBlockMatch
             checkMatch = isInROI(cBboxes(tempID,:),Ccentroids(sorted_area_rowC(ctr),1),...
                 Ccentroids(sorted_area_rowC(ctr),2));
             if (checkMatch == true && sorted_area_C(ctr) > min_conveyor)
