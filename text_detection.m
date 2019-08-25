@@ -14,7 +14,6 @@ function [paths, stroke_im, n_letters, letter_thickness] = text_detection(img)
 
     n_letters = size(blobs,2);
     
-    load('irb120.mat');
     paths = cell(1, n_letters); 
     letter_thickness = cell(1, n_letters);
     stroke_im = cell(1, n_letters); 
@@ -28,13 +27,18 @@ function [paths, stroke_im, n_letters, letter_thickness] = text_detection(img)
     end
     
     letter_fh = figure; 
+    load('rot_matrix.mat');
+    load('trans_mat.mat');
+    load('cameraParams.mat');
+    %load('irb120.mat');
 
     for i = 1:n_letters
         [strokes_grid_frame, stroke_im{i}] = calculateStrokes(grid_th, blobs(i), grid_fh, letter_fh);
-        paths{i} = strokesToRobFrame(strokes_grid_frame, grid_offset);
+        paths{i} = strokesToRobFrame(strokes_grid_frame, grid_offset, ...
+            cameraParams, R, t);
         letter_thickness{i} = getLetterThickness(thin_blob_ind, ...
             size(paths{i}, 2), i);
-        %plotStrokesWithRobot(strokes_rob_frame, irb120);
+        %plotStrokesWithRobot(paths{i}, irb120);
     end
     
     close(letter_fh);
@@ -328,13 +332,10 @@ function strokes = deleteUnusedStrokes(strokes, strokes_ind, max_strokes)
     end
 end
 
-function rob_strokes = strokesToRobFrame(strokes, offset)
+%function rob_strokes = strokesToRobFrame(strokes, offset)
+function rob_strokes = strokesToRobFrame(strokes, offset, cameraParams, R, t)
     n = size(strokes, 2);
     rob_strokes = cell(1, n);
-    
-    load('cameraParams.mat');
-    load('rot_matrix.mat');
-    load('trans_mat.mat');    
 
     for i = 1:n
        strokes{i}(1:2,:) = strokes{i}(1:2,:) + offset;
