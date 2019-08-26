@@ -1,4 +1,4 @@
-function [guiString, shape_color, conv_match_ctr] = Detection(conv_match_ctr, shape_color, min_conveyor,bdim)
+function [moveConveyorFlag, guiString, shape_color, conv_match_ctr] = Detection(conv_match_ctr, shape_color, min_conveyor,bdim)
     % CAKE - Computer Vision (Decoration)
     global detector_updated_FINAL;
     global camParam_Conv R_Conv t_Conv;
@@ -20,7 +20,7 @@ function [guiString, shape_color, conv_match_ctr] = Detection(conv_match_ctr, sh
 
             %for conveyor camera (get one frame)
             if(Offline)
-                cImage = imread('PnPTestC2.jpg');
+                cImage = imread('PnPTestC3.jpg'); %3,4,5,6
                 disp('Photo of Conveyor');
             else
                 cImage = MTRN4230_Image_Capture([],[]);
@@ -29,7 +29,7 @@ function [guiString, shape_color, conv_match_ctr] = Detection(conv_match_ctr, sh
             end
             cImage = imcrop(cImage,[515.0,4.50,676.00,720.00]);
 
-                moveConveyor(true,true); 
+                %moveConveyor(true,true); 
                 disp('Moved Conveyor Once');
                 [cBboxes,~,cLabels] = detect(detector_updated_FINAL,cImage,'Threshold',0.20,...
                         'NumStrongestRegions',10);
@@ -61,7 +61,7 @@ function [guiString, shape_color, conv_match_ctr] = Detection(conv_match_ctr, sh
          % no shape found in current frame
          % if anyShape is still false after all labels
          if (anyShape == false)
-             moveConveyor(true,true);
+             %moveConveyor(true,true);
              break; % activate conveyor to move to next set of blocks
          end 
 
@@ -114,9 +114,11 @@ function [guiString, shape_color, conv_match_ctr] = Detection(conv_match_ctr, sh
             if (posMatchNum == 0)
                disp('Scan More Blocks, Move Conveyor!');
                scanOnce = false;
+               moveConveyorFlag = true;
                pause(1.0);            
             else
                 scanOnce = true;
+                moveConveyorFlag = false;
             end                       
             break;
 
@@ -161,9 +163,11 @@ function [guiString, shape_color, conv_match_ctr] = Detection(conv_match_ctr, sh
                         if (posMatchNum == 0)
                            disp('Scan More Blocks, Move Conveyor!');
                            scanOnce = false;
+                           moveConveyorFlag = true;
                            pause(1.0);            
                         else
                             scanOnce = true;
+                            moveConveyorFlag = false;
                         end                  
             
                         break;
