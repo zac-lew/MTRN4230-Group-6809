@@ -1,4 +1,4 @@
-function [moveConveyorFlag, guiString, shape_color, conv_match_ctr] = Detection(conv_match_ctr, shape_color, min_conveyor,bdim)
+function [moveConveyorFlag, guiString, shape_color, conv_match_ctr,moveDirection] = Detection(conv_match_ctr, shape_color, min_conveyor,bdim)
     % CAKE - Computer Vision (Decoration)
     global detector_updated_FINAL;
     global camParam_Conv R_Conv t_Conv;
@@ -11,6 +11,7 @@ function [moveConveyorFlag, guiString, shape_color, conv_match_ctr] = Detection(
     correctColor = false;
     moveConveyorFlag = false;    
     failedDetect = 0;
+    moveDirection = 1; %forward
     
     %Xi,Yi,Xf,Yf,Angle_delta
     dataVector = zeros(1,5);
@@ -19,7 +20,8 @@ function [moveConveyorFlag, guiString, shape_color, conv_match_ctr] = Detection(
     while (true)
         
         if (failedDetect > 2)
-                moveConveyorFlag = true;     
+                moveConveyorFlag = true;  
+                moveDirection = 1; %forward
                 break;
         end
             
@@ -110,7 +112,17 @@ function [moveConveyorFlag, guiString, shape_color, conv_match_ctr] = Detection(
             block_angleC = 45.0; %checkBlockOrientation(aligned_blockC,2);
 
             % 4. Send Data to Robot Arm
-            guiString = createPnPData(tempJ,shape_color,tempX,tempY,block_angleC);    
+            [guiString,reachIssue,convDirection] = createPnPData(tempJ,shape_color,tempX,tempY,block_angleC);    
+            
+            if (reachIssue)
+                if (convDirection == 1)
+                    moveDirection = 1; %forward
+                else
+                    moveDirection = 0; %back
+                end
+                moveConveyorFlag = true;                    
+                break;
+            end            
 
             % If a block and color is successfully found, remove this
             % from the array so the conveyor does not look for it again
@@ -125,6 +137,7 @@ function [moveConveyorFlag, guiString, shape_color, conv_match_ctr] = Detection(
                disp('Scan More Blocks, Move Conveyor!');
                scanOnce = false;
                moveConveyorFlag = true;
+               moveDirection = 1; %forward
                pause(1.0);            
             else
                 scanOnce = true;
@@ -178,6 +191,7 @@ function [moveConveyorFlag, guiString, shape_color, conv_match_ctr] = Detection(
                            disp('Scan More Blocks, Move Conveyor!');
                            scanOnce = false;
                            moveConveyorFlag = true;
+                           moveDirection = 1; %forward
                            pause(1.0);            
                         else
                             scanOnce = true;
@@ -188,13 +202,10 @@ function [moveConveyorFlag, guiString, shape_color, conv_match_ctr] = Detection(
                     end
                 end            
             end
+            % Increment faile detect counter
+            % remove shape from labels
             failedDetect = failedDetect + 1;
-%             if (tempJ ~= 0)
-%                 shape_color(1:2,tempJ) = -1;                                     
-%             elseif (isempty(checkDuplicates))
-%                 shape_color(1:2,checkDuplicates(ix)) = -1;        
-%             end      
-            shape_color
+            cLabels(tempID) = '';    
         end
     end        
 end
