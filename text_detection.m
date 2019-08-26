@@ -125,7 +125,7 @@ function im = erodeThinLetters(grid_th)
 end
 
 function blobs = getBlobs(grid_th)
-    blobs = iblobs(grid_th, 'area', [520, 3450], 'boundary', ...
+    blobs = iblobs(grid_th, 'area', [520, 4000], 'boundary', ...
         'class', 0, 'aspect', [0.08,1]);
     
     if isempty(blobs)
@@ -140,8 +140,8 @@ function blobs = getBlobs(grid_th)
         blobs(blobs.perimeter < 160) = [];
     end
     
-    if ~isempty(find(blobs.perimeter > 650, 1))
-        blobs(blobs.perimeter > 650) = [];
+    if ~isempty(find(blobs.perimeter > 670, 1))
+        blobs(blobs.perimeter > 670) = [];
     end    
     
     % bold letters: 
