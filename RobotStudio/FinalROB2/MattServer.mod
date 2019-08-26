@@ -14,12 +14,13 @@ MODULE MattServer
     VAR num inkThick := 0;
     PERS num DrawPt{500,2};
     VAR num Zeros500{500,2};
+    VAR num Zeros5{5};
     VAR num arr5{5};
     VAR num count := 1;
     VAR bool check := FALSE;
     
     PROC Main ()
-        TPWrite ">>>>>>S>>>>>>";
+        TPWrite "____________START____________";
         In_str := "0";
         Out_str := "0";
         
@@ -29,7 +30,7 @@ MODULE MattServer
             host := "127.0.0.1";
         ENDIF
         MainServer;
-        TPWrite ">>>>>>F>>>>>>";
+        TPWrite "____________FINISH____________";
     ENDPROC
 
     PROC MainServer()
@@ -42,7 +43,7 @@ MODULE MattServer
     ENDPROC
 
     PROC WaitForMessage()
-		TPWrite ">>>>>>L>>>>>>  " + "In_str: " + In_str + "   Out_str: " + Out_str; 
+		TPWrite "<<<<<LOOP>>>>>  " + "In_str: " + In_str + "   Out_str: " + Out_str; 
 	
 		IF Out_str <> "0" THEN
 			SendOutStr;
@@ -55,18 +56,18 @@ MODULE MattServer
 			CASE "PNP": ! Pick and Place
 				SendACK;
 				TPWrite "Read PNP";
-                ! Making sure not red badly
+                ! Making sure not read badly
                 check := FALSE;
+                arr5 := Zeros5;
                 WHILE check = FALSE DO
                     In_Str := "0";
                     GetInStr;
-                    TPWrite "In_str: " + In_str;
                     ok := StrToVal(In_str,arr5);
                     IF arr5{1}<>0 AND arr5{2}<>0 AND arr5{3}<>0 AND arr5{4}<>0 AND arr5{5}<>0 THEN
                         TPWrite "Good: " + In_str + ", " + ValToStr(arr5{1}) + " " + ValToStr(arr5{2}) + " " + ValToStr(arr5{3}) + " " + ValToStr(arr5{4}) + " " + ValToStr(arr5{5});
                         check := TRUE;
                     ELSE
-                        TPWrite "Bad: " + In_str + ", "  + ValToStr(arr5{1}) + " " + ValToStr(arr5{2}) + " " + ValToStr(arr5{3}) + " " + ValToStr(arr5{4}) + " " + ValToStr(arr5{5});
+                        TPWrite "BAD: " + In_str + ", "  + ValToStr(arr5{1}) + " " + ValToStr(arr5{2}) + " " + ValToStr(arr5{3}) + " " + ValToStr(arr5{4}) + " " + ValToStr(arr5{5});
                     ENDIF
                 ENDWHILE
                 SendACK;
@@ -189,11 +190,12 @@ MODULE MattServer
         ! Receive a string from the client.
         SocketReceive client_socket \Str:=received_str;
         In_str := received_str;
-        TPWrite "Got new string: " + In_str;
+        !TPWrite "Got new string: " + In_str;
     ENDPROC
     
     PROC SendACK()
-        SocketSend client_socket \Str:=("ACK" + "\0A");  
+        TPWrite "ACK";
+        SocketSend client_socket \Str:=("ACK" + "\0A"); 
     ENDPROC
     
     

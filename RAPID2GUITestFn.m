@@ -13,7 +13,8 @@ global socket_1 socket_2 Offline;
 
 robot_IP_address = '192.168.125.1'; % Real
 
-Offline = false;
+%Offline = false;
+Offline = true;
 if(Offline)
     robot_IP_address = '127.0.0.1'; % Simulated
 end

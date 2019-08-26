@@ -1,10 +1,6 @@
 % RGB at Conveyor
 function [color_rgb_hi,color_rgb_low] = RGB_IteratorC(counter)
-    disp(counter)
-    disp(class(counter))
     counter = uint8(fix(counter));
-    disp(counter)
-    disp(class(counter))
     switch(counter)
         case(1)
              % Threshold for RGB - RED
