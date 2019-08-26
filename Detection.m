@@ -1,12 +1,12 @@
 function [guiString, shape_color, conv_match_ctr] = Detection(conv_match_ctr, shape_color, min_conveyor,bdim)
     % CAKE - Computer Vision (Decoration)
     global detector_updated_FINAL;
-    global useRobotCellCamera;
     global camParam_Conv R_Conv t_Conv;
     global scanOnce;
     global cLabels cBboxes;
     global posMatchNum;
     global cImage;
+    global Offline;
     
     correctColor = false;
     
@@ -19,13 +19,13 @@ function [guiString, shape_color, conv_match_ctr] = Detection(conv_match_ctr, sh
         if (~scanOnce) % looking at current frame (no need to move conveyor along)
 
             %for conveyor camera (get one frame)
-            if(useRobotCellCamera)
-                cImage = MTRN4230_Image_Capture([],[]); 
-                disp('Photo of Conveyor Taken');
-            else
+            if(Offline)
                 cImage = imread('PnPTestC2.jpg');
                 disp('Photo of Conveyor');
-                %cImage = imread('.\YOLO_TEST\ConveyorImages\C12.jpg');
+            else
+                cImage = MTRN4230_Image_Capture([],[]);
+                disp('Photo of Conveyor Taken');
+
             end
             cImage = imcrop(cImage,[515.0,4.50,676.00,720.00]);
 
@@ -97,7 +97,7 @@ function [guiString, shape_color, conv_match_ctr] = Detection(conv_match_ctr, sh
 
             angle_roiC = [tempX-bdim/2,tempY-bdim/2,bdim,bdim];
             aligned_blockC = imcrop(tempROI_imageC,angle_roiC); % CustomerImage remains as RGB for color detection
-            block_angleC = checkBlockOrientation(aligned_blockC,2);
+            block_angleC = 45.0; %checkBlockOrientation(aligned_blockC,2);
 
             % 4. Send Data to Robot Arm
             guiString = createPnPData(tempJ,shape_color,tempX,tempY,block_angleC);    

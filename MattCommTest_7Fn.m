@@ -1,10 +1,10 @@
 function MattCommTest_7Fn(app,runtype)
-    global socket_1;
-    global socket_2;
+    global socket_1 socket_2 Offline;
     global scanOnce;
     global cLabels cBboxes;
     global posMatchNum;
     global cImage;
+    
     
     scanOnce = false;
     posMatchNum = 0;
@@ -13,7 +13,6 @@ function MattCommTest_7Fn(app,runtype)
     % runtype = 0(pnp then ink), 1 (pnp only), 2 (ink only), 3( conveyor
     % on), 4 (conveyor off), 5 (Vac on), 6 (Vac off), 9 (just take customer image)
     runtype = 0; % temporary
-    Offline = true;
 
     while(~FinishedFlag)
         if(isequal(get(socket_1, 'Status'), 'open'))
@@ -26,7 +25,7 @@ function MattCommTest_7Fn(app,runtype)
                     % Take photo and set
                     img = MTRN4230_Image_Capture([]); 
                     textImg = img;
-                    customerImg = img;
+                    customerImage = img;
                 end
             end
             
@@ -48,7 +47,7 @@ function MattCommTest_7Fn(app,runtype)
                     else
                         fprintf("Bad Message \n");
                     end
-                    pause(3);
+                    pause(2);
                 end
             end
             

@@ -9,10 +9,14 @@ global camParam_Conv R_Conv t_Conv;
 global camParam_Table R_Table t_Table;
 
 %% CONNECTION
-global socket_1 socket_2;
+global socket_1 socket_2 Offline;
 
-robot_IP_address = '127.0.0.1'; % Simulated
-%robot_IP_address = '192.168.125.1'; % Real
+robot_IP_address = '192.168.125.1'; % Real
+
+Offline = false;
+if(Offline)
+    robot_IP_address = '127.0.0.1'; % Simulated
+end
 robot_port_1 = 1025; robot_port_2 = 1026;
 
 socket_1 = Connect(robot_IP_address, robot_port_1);
@@ -24,18 +28,6 @@ set(socket_2, 'BytesAvailableFcn', 'dispcallback');
 global app;
 app = BasicGUINewRev3();
 disp('GUI OPEN');
-
-if(~isequal(get(socket_1, 'Status'), 'open'))
-        fopen(socket_1);
-        disp('Connected');
-        app.TextArea.Value = 'Robot Connected SUCCESS';  
-        app.ConnectionStatusLamp.Color = 'g';
-else
-        fprintf('Could not open TCP connection to %s on port %d\n',robot_IP_address, robot_port_1);
-        app.TextArea.Value = 'Robot Connection FAILED';  
-        app.ConnectionStatusLamp.Color = 'r';
-        drawnow
-end
 
 while(isequal(get(socket_1, 'Status'), 'open'))
     app.ReadyforCustomerOrderLamp,Color = 'g';
