@@ -62,7 +62,7 @@ function [moveConveyorFlag, guiString, shape_color, conv_match_ctr] = Detection(
 
          % no shape found in current frame
          % if anyShape is still false after all labels
-         if (anyShape == false || isempty(tempJ))
+         if (anyShape == false)
              moveConveyorFlag = true;
              break; % activate conveyor to move to next set of blocks
          end 
