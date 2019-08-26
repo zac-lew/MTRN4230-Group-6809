@@ -21,6 +21,9 @@ function [paths, stroke_im, n_letters, letter_thickness] = text_detection(img)
     if debug == 1
         % plot all strokes on the grid image
         grid_fh = figure; idisp(grid_th); hold on;
+        title('Letter strokes and thick letters shown with box');
+        
+
     else
         % we don't want to plot the strokes
         grid_fh = -1;
@@ -39,6 +42,11 @@ function [paths, stroke_im, n_letters, letter_thickness] = text_detection(img)
         letter_thickness{i} = getLetterThickness(thin_blob_ind, ...
             size(paths{i}, 2), i);
         %plotStrokesWithRobot(paths{i}, irb120);
+
+        if letter_thickness{i}{1} == 0 && debug == 1
+            figure(grid_fh);
+            blobs(i).plot_box;
+        end
     end
     
     close(letter_fh);
