@@ -282,7 +282,7 @@ function [strokes_grid_frame, stroke_im] = calculateStrokes(grid_th, blob, grid_
                 %triple_points(cur_pt(2), cur_pt(1)) = 0;
                 
                 if n_unexplored > 0
-                    next_pt = unexplored_tps(:, n_unexplored);
+                    next_pt = getNextTp(cur_pt, unexplored_tps);
                 end
                 %prev_pt = next_pt; % to prevent problems in getNextStep
                 
@@ -299,7 +299,7 @@ function [strokes_grid_frame, stroke_im] = calculateStrokes(grid_th, blob, grid_
                % keep this segment and finish the stroke 
                [seg_ind, strk_ind, strk] = flushSeg(seg_ind, strk_ind, seg, strk);
                [strk_ind, strokes_ind, strokes, strk] = flushStroke(strokes_ind, strk_ind, strk, strokes);
-               next_pt = unexplored_tps(:, n_unexplored);
+               next_pt = getNextTp(cur_pt, unexplored_tps);
             else 
                % discard this segment, and move back to the last tp
                seg_ind = 1;
@@ -342,6 +342,26 @@ function [strokes_grid_frame, stroke_im] = calculateStrokes(grid_th, blob, grid_
     
     stroke_im = export_fig(letter_fh, '-q0');
     figure(letter_fh); hold off;
+end
+
+function next = getNextTp(cur_pt, unexplored_tps)
+    next = [1; 1];
+    n = size(unexplored_tps, 2);
+    min_dist = 100000;
+    min_ind = 0;
+    %dist = zeros(1, n);
+    
+    % next triple point is closest pt to where we finished the last segment
+    for i = 1:n
+        dist = distToPt(cur_pt, unexplored_tps(:,i));
+        
+        if dist < min_dist
+            min_dist = dist;
+            min_ind = i;
+        end
+    end
+    
+    next = unexplored_tps(:, min_ind);
 end
 
 function strokes = deleteUnusedStrokes(strokes, strokes_ind, max_strokes)
