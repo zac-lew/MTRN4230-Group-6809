@@ -1,7 +1,9 @@
 function run_text_detection()
     close all; 
-    basename = '../w8-photos/'; 
+    %basename = '../jonathon-images/'; 
+    %basename = '../sample_text_images/';
     %basename = '../cake-design-photos/';
+    basename = '../w8-photos/';
     files = dir(strcat(basename, 'table*'));
     %files = flipud(files);
     
@@ -9,6 +11,7 @@ function run_text_detection()
        img = iread(strcat(basename, f.name));
        [blob_paths, blob_im, n_letters, letter_thickness] = text_detection(img);
        pause;
+       disp(f.name);
        close all;
     end
     

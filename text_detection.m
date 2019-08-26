@@ -1,5 +1,6 @@
 function [paths, stroke_im, n_letters, letter_thickness] = text_detection(img)
     debug = 0;
+    %img = iread('../w8-photos/table (4).jpg');
     
     addpath('export-fig\'); % need export-fig to export blob stroke plot
     addpath('douglas-peucker\'); % for line simplification
@@ -114,6 +115,7 @@ function [grid_th, grid_offset] = getGridRoi(grey)
     % grid_roi_rect = [470,1112;346,703]; % found with iroi
     grid_roi_rect = [418,1182;285,789]; % covers all grid squares, including side ones
     %grid_roi_rect = [542,1055;278,791]; % covers only middle grid squares
+    %grid_roi_rect = [530,1055; 278,791]; % covers a bit more than the middle square
     th = otsu(grey);
     grey_th = (grey >= th); 
     grid_th = iroi(grey_th, grid_roi_rect);
