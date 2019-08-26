@@ -111,7 +111,7 @@ MODULE ErrorHandling
         CONNECT sigMotionSuspended_1 WITH trapMotionSuspended_1;
         ISignalDO DO_MOTION_SUP_TRIG,1,sigMotionSuspended_1;
         CONNECT sigConveyor_0 WITH trapConveyor_0;
-        ISignalDO DO10_1,1,sigConveyor_0;
+        ISignalDI DI10_1,0,sigConveyor_0;
         
     ENDPROC
     

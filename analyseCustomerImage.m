@@ -250,4 +250,5 @@ function [shape_color,missingBlockMatch] = analyseCustomerImage(customerImage,ML
     end
     
     missingBlockMatch = find(shape_color(1,:) == 0);
+    missingBlockMatch = size(missingBlockMatch,2);
 end

@@ -2,6 +2,7 @@ function block_angle = checkBlockOrientation(block_image,location)
     
     block_image = rgb2gray(block_image);
     
+    % Might need to tweak threshold on day
     if (location == 1) % using robot cell camera
         threshold = 0.8;
     else

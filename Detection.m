@@ -1,14 +1,16 @@
-function [guiString, shape_color, conv_match_ctr] = Detection(conv_match_ctr, shape_color, min_conveyor,bdim)
+function [moveConveyorFlag, guiString, shape_color, conv_match_ctr] = Detection(conv_match_ctr, shape_color, min_conveyor,bdim)
     % CAKE - Computer Vision (Decoration)
     global detector_updated_FINAL;
-    global useRobotCellCamera;
     global camParam_Conv R_Conv t_Conv;
     global scanOnce;
     global cLabels cBboxes;
     global posMatchNum;
     global cImage;
+    global Offline;
     
     correctColor = false;
+    moveConveyorFlag = false;
+    tempJ = 0;
     
     %Xi,Yi,Xf,Yf,Angle_delta
     dataVector = zeros(1,5);
@@ -16,20 +18,20 @@ function [guiString, shape_color, conv_match_ctr] = Detection(conv_match_ctr, sh
     % for each frame at a time
     while (true)
 
-        if (~scanOnce) % looking at current frame (no need to move conveyor along)
+        %if (~scanOnce) % looking at current frame (no need to move conveyor along)
 
             %for conveyor camera (get one frame)
-            if(useRobotCellCamera)
-                cImage = MTRN4230_Image_Capture([],[]); 
-                disp('Photo of Conveyor Taken');
-            else
-                cImage = imread('PnPTestC2.jpg');
+            if(Offline)
+                cImage = imread('PnPTestC3.jpg'); %3,4,5,6
                 disp('Photo of Conveyor');
-                %cImage = imread('.\YOLO_TEST\ConveyorImages\C12.jpg');
+            else
+                cImage = MTRN4230_Image_Capture([],[]);
+                disp('Photo of Conveyor Taken');
+
             end
             cImage = imcrop(cImage,[515.0,4.50,676.00,720.00]);
 
-                moveConveyor(true,true); 
+                %moveConveyor(true,true); 
                 disp('Moved Conveyor Once');
                 [cBboxes,~,cLabels] = detect(detector_updated_FINAL,cImage,'Threshold',0.20,...
                         'NumStrongestRegions',10);
@@ -41,7 +43,7 @@ function [guiString, shape_color, conv_match_ctr] = Detection(conv_match_ctr, sh
                         posMatchNum = posMatchNum + 1;
                     end
                 end 
-        end
+        %end
         
         % Look for a shape_color pair in current frame @ conveyor                            
         anyShape = false;
@@ -60,8 +62,8 @@ function [guiString, shape_color, conv_match_ctr] = Detection(conv_match_ctr, sh
 
          % no shape found in current frame
          % if anyShape is still false after all labels
-         if (anyShape == false)
-             moveConveyor(true,true);
+         if (anyShape == false || isempty(tempJ))
+             moveConveyorFlag = true;
              break; % activate conveyor to move to next set of blocks
          end 
 
@@ -97,7 +99,7 @@ function [guiString, shape_color, conv_match_ctr] = Detection(conv_match_ctr, sh
 
             angle_roiC = [tempX-bdim/2,tempY-bdim/2,bdim,bdim];
             aligned_blockC = imcrop(tempROI_imageC,angle_roiC); % CustomerImage remains as RGB for color detection
-            block_angleC = checkBlockOrientation(aligned_blockC,2);
+            block_angleC = 45.0; %checkBlockOrientation(aligned_blockC,2);
 
             % 4. Send Data to Robot Arm
             guiString = createPnPData(tempJ,shape_color,tempX,tempY,block_angleC);    
@@ -114,9 +116,11 @@ function [guiString, shape_color, conv_match_ctr] = Detection(conv_match_ctr, sh
             if (posMatchNum == 0)
                disp('Scan More Blocks, Move Conveyor!');
                scanOnce = false;
+               moveConveyorFlag = true;
                pause(1.0);            
             else
                 scanOnce = true;
+                moveConveyorFlag = false;
             end                       
             break;
 
@@ -127,9 +131,16 @@ function [guiString, shape_color, conv_match_ctr] = Detection(conv_match_ctr, sh
             shapeID = shape_color(1,tempJ);
             checkDuplicates = find(shape_color(1,:) == shapeID);
             numDuplicates = size(checkDuplicates,2);
+            if (numDuplicates == 0)
+                moveConveyorFlag = true;
+            end
             for j = 1 : size(checkDuplicates,2) %eg: [3 4]
                 ix = find(checkDuplicates(1,:) ~= tempJ);
                 % if more than one of the shape, check color
+                if (numDuplicates == 0)
+                    moveConveyorFlag = true;
+                    return;
+                end
                 if (numDuplicates > 0)
                     [correctColor,newX,newY] = isShapeRightColor(shape_color,checkDuplicates(ix),cBboxes,...
                         cImage,tempID,min_conveyor);       
@@ -161,9 +172,11 @@ function [guiString, shape_color, conv_match_ctr] = Detection(conv_match_ctr, sh
                         if (posMatchNum == 0)
                            disp('Scan More Blocks, Move Conveyor!');
                            scanOnce = false;
+                           moveConveyorFlag = true;
                            pause(1.0);            
                         else
                             scanOnce = true;
+                            moveConveyorFlag = false;
                         end                  
             
                         break;
@@ -172,5 +185,6 @@ function [guiString, shape_color, conv_match_ctr] = Detection(conv_match_ctr, sh
             %scanOnce = true;
             end
         end
+        moveConveyorFlag = true;
     end        
 end

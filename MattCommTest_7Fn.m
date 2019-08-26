@@ -1,10 +1,10 @@
 function MattCommTest_7Fn(app,runtype)
-    global socket_1;
-    global socket_2;
+    global socket_1 socket_2 Offline;
     global scanOnce;
     global cLabels cBboxes;
     global posMatchNum;
     global cImage;
+    
     
     scanOnce = false;
     posMatchNum = 0;
@@ -13,7 +13,6 @@ function MattCommTest_7Fn(app,runtype)
     % runtype = 0(pnp then ink), 1 (pnp only), 2 (ink only), 3( conveyor
     % on), 4 (conveyor off), 5 (Vac on), 6 (Vac off), 9 (just take customer image)
     runtype = 0; % temporary
-    Offline = true;
 
     while(~FinishedFlag)
         if(isequal(get(socket_1, 'Status'), 'open'))
@@ -21,12 +20,12 @@ function MattCommTest_7Fn(app,runtype)
             if(runtype == 0 || runtype == 1 || runtype == 2 || runtype == 9)
                 if(Offline)
                     textImg = iread('table (8).jpg');
-                    customerImage = imread('PnpTestT2.jpg');
+                    customerImage = imread('PnpTestT3.jpg');
                 else
                     % Take photo and set
                     img = MTRN4230_Image_Capture([]); 
                     textImg = img;
-                    customerImg = img;
+                    customerImage = img;
                 end
             end
             
@@ -37,9 +36,10 @@ function MattCommTest_7Fn(app,runtype)
                 [shape_color,missingBlockMatch] = analyseCustomerImage(customerImage,0.20,350);
 
                 while(conv_match_ctr ~= (size(shape_color,2) - missingBlockMatch))
-                    [PnPMessage, shape_color, conv_match_ctr]  = Detection(conv_match_ctr, shape_color,275,75);
-                    if( PnPMessage.strlength > 1)
-                        %FlushSocket(socket_1);
+                    [moveConveyorFlag, PnPMessage, shape_color, conv_match_ctr] = Detection(conv_match_ctr, shape_color, 275,75);
+                    if(moveConveyorFlag)
+                        PulseConv(socket_1);
+                    elseif( PnPMessage.strlength > 1)
                         SendMessage(socket_1,"PNP");              
                         SendMessage(socket_1,PnPMessage);
                         LookForMessage(socket_1,"DONE");
@@ -48,7 +48,7 @@ function MattCommTest_7Fn(app,runtype)
                     else
                         fprintf("Bad Message \n");
                     end
-                    pause(3);
+                    pause(0.5);
                 end
             end
             
@@ -118,6 +118,16 @@ function MattCommTest_7Fn(app,runtype)
     fclose(socket_1);
 end
 %% Functions
+
+function PulseConv(socket_1)
+    SendMessage(socket_1,"CFW");
+    LookForMessage(socket_1,"DONE");
+    SendMessage(socket_1,"CON");
+    LookForMessage(socket_1,"DONE");
+    pause(0.5);
+    SendMessage(socket_1,"COF");
+    LookForMessage(socket_1,"DONE");
+end
 
 function socket = Connect(robot_IP_address, robot_port)
     socket = tcpip(robot_IP_address, robot_port);    

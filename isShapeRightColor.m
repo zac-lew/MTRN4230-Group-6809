@@ -6,6 +6,11 @@ function [correctColor,tempX,tempY] = isShapeRightColor(shape_color,tempJ,cBboxe
     csv_encoding = shape_color(2,tempJ);
     [color_rgb_hi,color_rgb_low] = RGB_IteratorC(csv_encoding);               
 
+    if (color_rgb_hi == [0,0,0])
+        correctColor = false;
+        return;
+    end
+    
     mask_desiredC = (cImage(:,:,1) >= color_rgb_low(1)) & (cImage(:,:,1) <= color_rgb_hi(1)) & ...
             (cImage(:,:,2) >= color_rgb_low(2) ) & (cImage(:,:,2) <= color_rgb_hi(2)) & ...
             (cImage(:,:,3) >= color_rgb_low(3) ) & (cImage(:,:,3) <= color_rgb_hi(3));
@@ -32,4 +37,5 @@ function [correctColor,tempX,tempY] = isShapeRightColor(shape_color,tempJ,cBboxe
                 break;
             end
         end
+    end
 end
