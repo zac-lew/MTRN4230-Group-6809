@@ -271,12 +271,10 @@ function [strokes_grid_frame, stroke_im] = calculateStrokes(grid_th, blob, grid_
             if regionIsExplored(cur_pt, skeleton) ...
                     || willBeDeserted(cur_pt, skeleton, visited_tps)
                 % remove tp from search
-                [v, ind] = ismember(cur_pt, unexplored_tps);
-                
-                if ind(2) > 0 
-                    unexplored_tps(:, ceil(ind(2)/2)) = [];
-                    
-                    % decrement n_unexplored tps
+                ind = find(unexplored_tps(1,:) == cur_pt(1) & unexplored_tps(2,:) == cur_pt(2));
+
+                if ~isempty(ind)
+                    unexplored_tps(:,ind) = [];
                     n_unexplored = n_unexplored - 1;
                 end                    
                     
