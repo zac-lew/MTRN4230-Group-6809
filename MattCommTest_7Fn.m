@@ -20,7 +20,7 @@ function MattCommTest_7Fn(app,runtype)
             if(runtype == 0 || runtype == 1 || runtype == 2 || runtype == 9)
                 if(Offline)
                     textImg = iread('table (8).jpg');
-                    customerImage = imread('PnpTestT2.jpg');
+                    customerImage = imread('PnpTestT3.jpg');
                 else
                     % Take photo and set
                     img = MTRN4230_Image_Capture([]); 
@@ -36,8 +36,13 @@ function MattCommTest_7Fn(app,runtype)
                 [shape_color,missingBlockMatch] = analyseCustomerImage(customerImage,0.20,350);
 
                 while(conv_match_ctr ~= (size(shape_color,2) - missingBlockMatch))
-                    [PnPMessage, shape_color, conv_match_ctr]  = Detection(conv_match_ctr, shape_color,275,75);
-                    if( PnPMessage.strlength > 1)
+                    [moveConveyorFlag, PnPMessage, shape_color, conv_match_ctr] = Detection(conv_match_ctr, shape_color, 275,75);
+                    if(moveConveyorFlag)
+                        SendMessage(socket_1,"CFW");
+                        SendMessage(socket_1,"CON");
+                        pause(0.5);
+                        SendMessage(socket_1,"COF");
+                    elseif( PnPMessage.strlength > 1)
                         %FlushSocket(socket_1);
                         SendMessage(socket_1,"PNP");              
                         SendMessage(socket_1,PnPMessage);
@@ -47,7 +52,7 @@ function MattCommTest_7Fn(app,runtype)
                     else
                         fprintf("Bad Message \n");
                     end
-                    pause(2);
+                    pause(1);
                 end
             end
             

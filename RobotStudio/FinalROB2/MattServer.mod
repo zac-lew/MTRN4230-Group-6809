@@ -63,11 +63,11 @@ MODULE MattServer
                     In_Str := "0";
                     GetInStr;
                     ok := StrToVal(In_str,arr5);
-                    IF arr5{1}<>0 AND arr5{2}<>0 AND arr5{3}<>0 AND arr5{4}<>0 AND arr5{5}<>0 THEN
+                    IF arr5{1} = 0 AND arr5{2} = 0 AND arr5{3} = 0 AND arr5{4} = 0 AND arr5{5} = 0 THEN
+                        TPWrite "BAD: " + In_str + ", "  + ValToStr(arr5{1}) + " " + ValToStr(arr5{2}) + " " + ValToStr(arr5{3}) + " " + ValToStr(arr5{4}) + " " + ValToStr(arr5{5});
+                    ELSE
                         TPWrite "Good: " + In_str + ", " + ValToStr(arr5{1}) + " " + ValToStr(arr5{2}) + " " + ValToStr(arr5{3}) + " " + ValToStr(arr5{4}) + " " + ValToStr(arr5{5});
                         check := TRUE;
-                    ELSE
-                        TPWrite "BAD: " + In_str + ", "  + ValToStr(arr5{1}) + " " + ValToStr(arr5{2}) + " " + ValToStr(arr5{3}) + " " + ValToStr(arr5{4}) + " " + ValToStr(arr5{5});
                     ENDIF
                 ENDWHILE
                 SendACK;
