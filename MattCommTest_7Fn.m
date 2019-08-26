@@ -3,8 +3,7 @@ function MattCommTest_7Fn(app,runtype)
     global scanOnce;
     global cLabels cBboxes;
     global posMatchNum;
-    global cImage;
-    
+    global cImage;    
     
     scanOnce = false;
     posMatchNum = 0;
@@ -36,9 +35,11 @@ function MattCommTest_7Fn(app,runtype)
                 [shape_color,missingBlockMatch] = analyseCustomerImage(customerImage,0.20,350);
 
                 while(conv_match_ctr ~= (size(shape_color,2) - missingBlockMatch))
-                    [moveConveyorFlag, PnPMessage, shape_color, conv_match_ctr] = Detection(conv_match_ctr, shape_color, 275,75);
-                    if(moveConveyorFlag)
-                        PulseConv(socket_1);
+                    [moveConveyorFlag, PnPMessage, shape_color, conv_match_ctr,CmoveDirection] = Detection(conv_match_ctr, shape_color, 275,75);
+                    if(moveConveyorFlag && CmoveDirection == 1)
+                        PulseConv(socket_1,1);
+                    elseif (moveConveyorFlag && CmoveDirection == 0)
+                        PulseConv(socket_1,2);
                     elseif( PnPMessage.strlength > 1)
                         SendMessage(socket_1,"PNP");              
                         SendMessage(socket_1,PnPMessage);
@@ -119,14 +120,26 @@ function MattCommTest_7Fn(app,runtype)
 end
 %% Functions
 
-function PulseConv(socket_1)
-    SendMessage(socket_1,"CFW");
-    LookForMessage(socket_1,"DONE");
-    SendMessage(socket_1,"CON");
-    LookForMessage(socket_1,"DONE");
-    pause(0.5);
-    SendMessage(socket_1,"COF");
-    LookForMessage(socket_1,"DONE");
+function PulseConv(socket_1,conveyorDirection)
+    if (conveyorDirection == 1)
+        % send command for forward direction
+        SendMessage(socket_1,"CFW");
+        LookForMessage(socket_1,"DONE");
+        SendMessage(socket_1,"CON");
+        LookForMessage(socket_1,"DONE");
+        pause(0.5);
+        SendMessage(socket_1,"COF");
+        LookForMessage(socket_1,"DONE");
+    else
+        % send command for backward direction
+        SendMessage(socket_1,"CFW");
+        LookForMessage(socket_1,"DONE");
+        SendMessage(socket_1,"CON");
+        LookForMessage(socket_1,"DONE");
+        pause(0.5);
+        SendMessage(socket_1,"COF");
+        LookForMessage(socket_1,"DONE");
+    end    
 end
 
 function socket = Connect(robot_IP_address, robot_port)
