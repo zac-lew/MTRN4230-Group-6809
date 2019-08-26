@@ -17,7 +17,6 @@ robot_port_1 = 1025; robot_port_2 = 1026;
 
 socket_1 = Connect(robot_IP_address, robot_port_1);
 socket_2 = Connect(robot_IP_address, robot_port_2);
-set(socket_2, 'ReadAsyncMode', 'continuous');
 set(socket_2, 'BytesAvailableFcn', 'dispcallback');
 
 

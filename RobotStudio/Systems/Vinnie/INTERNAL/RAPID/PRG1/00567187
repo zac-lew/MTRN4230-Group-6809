@@ -55,7 +55,6 @@ MODULE MattServer
 			CASE "PNP": ! Pick and Place
 				SendACK;
 				TPWrite "Read PNP";
-                FlushSocket;
                 ! Making sure not red badly
                 check := FALSE;
                 WHILE check = FALSE DO
@@ -64,11 +63,13 @@ MODULE MattServer
                     TPWrite "In_str: " + In_str;
                     ok := StrToVal(In_str,arr5);
                     IF arr5{1}<>0 AND arr5{2}<>0 AND arr5{3}<>0 AND arr5{4}<>0 AND arr5{5}<>0 THEN
+                        TPWrite "Good: " + In_str + ", " + ValToStr(arr5{1}) + " " + ValToStr(arr5{2}) + " " + ValToStr(arr5{3}) + " " + ValToStr(arr5{4}) + " " + ValToStr(arr5{5});
                         check := TRUE;
+                    ELSE
+                        TPWrite "Bad: " + In_str + ", "  + ValToStr(arr5{1}) + " " + ValToStr(arr5{2}) + " " + ValToStr(arr5{3}) + " " + ValToStr(arr5{4}) + " " + ValToStr(arr5{5});
                     ENDIF
                 ENDWHILE
                 SendACK;
-                TPWrite ValToStr(arr5{1}) + " " + ValToStr(arr5{2}) + " " + ValToStr(arr5{3}) + " " + ValToStr(arr5{4}) + " " + ValToStr(arr5{5});
 				MattMain;
 				
 			CASE "INK": ! Ink print
@@ -155,9 +156,8 @@ MODULE MattServer
 				Out_Str := "DONE";
 
 			DEFAULT:
-				FlushSocket;
+				! FlushSocket;
 				In_Str := "0";
-				Out_Str := "0";
 			ENDTEST
 		ENDIF       
 			
