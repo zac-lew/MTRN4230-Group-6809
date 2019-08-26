@@ -223,7 +223,19 @@ function [strokes_grid_frame, stroke_im] = calculateStrokes(grid_th, blob, grid_
     %end_pts = convertLogToPoints(end_pts_log, tp_offset);
 
     n_unexplored = size(unexplored_tps, 2);
-    cur_pt = unexplored_tps(:,1); % todo: optimise tp choice
+    
+    if n_unexplored == 0
+        % no triple points have been detected, so we'll choose a random
+        % starting point. 
+        [y, x] = find(skeleton, 15);
+        cur_pt = [x(end); y(end)];
+        n_unexplored = 1;
+        unexplored_tps = cur_pt;
+        triple_points(cur_pt(2), cur_pt(1)) = 1;
+    else 
+        cur_pt = unexplored_tps(:,1); % todo: optimise tp choice
+    end
+    
     prev_pt = cur_pt;
     %figure; idisp(blob_im);
     visited_tps = zeros(size(triple_points));
