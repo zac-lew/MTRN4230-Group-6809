@@ -1,4 +1,4 @@
-function [guiString, shape_color, conv_match_ctr] = Detection(conv_match_ctr, shape_color, min_conveyor,bdimC)
+function [guiString, shape_color, conv_match_ctr] = Detection(conv_match_ctr, shape_color, min_conveyor,bdim)
     % CAKE - Computer Vision (Decoration)
     global detector_updated_FINAL;
     global useRobotCellCamera;

@@ -232,7 +232,9 @@ function [shape_color,missingBlockMatch] = analyseCustomerImage(customerImage,ML
         aligned_block = imcrop(tempROI_image,angle_roi); % CustomerImage remains as RGB for color detection
 
         % Call function to detect orientation
-        block_angle = checkBlockOrientation(aligned_block,1);      
+        % !!!!!!!!!!!!!!!!!!!! TEMPORARILY COMMENTED OUT WHILE NOT WORKING
+        %block_angle = checkBlockOrientation(aligned_block,1);   
+        block_angle = 45;
         text(shape_color(3,k)-50,shape_color(4,k),num2str(block_angle),'FontSize',10,'Color','b','FontWeight','bold')
         shape_color(5,k) = round(block_angle);
         tempROI_image = ROI_image;

@@ -5,6 +5,12 @@ function blockInfo = sendPnP(dataV)
     startBracket = '[';
     endBracket = ']';
     dataV =  fix(dataV);
+    
+    % !!!!!!!!!!!!!!!!!!!!!!!!11 Swapping 3 and 4
+    temp = dataV(4);
+    dataV(4) = dataV(3);
+    dataV(3) = temp;
+    
     stringBlock = string(dataV);    
     blockInfo = join(stringBlock,",");
     blockInfo = strcat(startBracket,blockInfo,endBracket);

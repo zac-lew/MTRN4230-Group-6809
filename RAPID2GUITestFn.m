@@ -11,8 +11,8 @@ global camParam_Table R_Table t_Table;
 %% CONNECTION
 global socket_1 socket_2;
 
-robot_IP_address = '127.0.0.1';         % Simulated
-%robot_IP_address = '192.168.125.1';    % Real
+robot_IP_address = '127.0.0.1'; % Simulated
+%robot_IP_address = '192.168.125.1'; % Real
 robot_port_1 = 1025; robot_port_2 = 1026;
 
 socket_1 = Connect(robot_IP_address, robot_port_1);
@@ -22,6 +22,7 @@ set(socket_2, 'BytesAvailableFcn', 'dispcallback');
 
 
 %% GUI
+global app;
 app = BasicGUINewRev3();
 disp('GUI OPEN');
 
@@ -121,117 +122,6 @@ function message = LookForMessage(socket,message)
         i = i + 1;
     end
     return 
-end
-
-function Str2GUI(app,str)
-    switch str
-        case ('CONVEYON')
-            app.ConRunLamp.Color = 'g';
-            app.ConRunLamp.Color = [0 1 0];
-            app.ConRunButton.Value = 1;
-            app.TextArea.Value = 'Conveyor Running...';
-            fprintf(char(str));
-            fprintf('\n');
-            drawnow
-        case ('CONVEYOF')
-            app.ConRunLamp.Color = 'r';
-            app.ConRunLamp.Color = [1 0 0];
-            app.ConRunButton.Value = 0;
-            app.TextArea.Value = 'Conveyor Stopped'; 
-            fprintf(char(str));
-            fprintf('\n');
-            drawnow
-        case ('CONVDIR1')
-            app.DirectionSwitch_Changed = 1;
-            app.DirectionSwitch.Value = 'Forward';
-            app.TextArea.Value = 'Conveyor Direction Forward'; 
-            fprintf(char(str));
-            fprintf('\n');
-            drawnow
-        case ('CONVDIR0')
-            app.DirectionSwitch_Changed = 0;
-            app.DirectionSwitch.Value = 'Backward'; 
-            app.TextArea.Value = 'Conveyor Direction Reverse';  
-            fprintf(char(str));
-            fprintf('\n');
-            drawnow
-        case('SETSOLE1')
-            app.VacSolLamp.Color = 'g';
-            app.VacSolSwitch.Value = 'On';
-            app.TextArea.Value = 'Vac Sol Running...';
-            fprintf(char(str));
-            fprintf('\n');
-            drawnow
-        case('SETSOLE0')
-            app.VacSolLamp.Color = 'r'; 
-            app.VacSolSwitch.Value = 'Off';
-            app.TextArea.Value = 'Vac Sol Stopped';
-            fprintf(char(str));
-            fprintf('\n');
-            drawnow
-        case('VACUUMON')
-            app.VacRunLamp.Color = 'g';
-            app.VacRunButton.Value = 1;
-            app.TextArea.Value = 'Vacuum Running...';
-            fprintf(char(str));
-            fprintf('\n');
-            drawnow
-        case('VACUUMOF')
-            app.VacRunLamp.Color = 'r';
-            app.TextArea.Value = 'Vacuum Stopped';
-            app.VacRunButton.Value = 0;
-            fprintf(char(str));
-            fprintf('\n');
-            drawnow
-        case('ESTOP')
-            app.TabGroup.SelectedTab = app.EStopTab;
-            app.EmergencyStopLamp.Color = [1 0 0];
-            app.DirectionSwitch.Value = 'Backward';
-            app.ConRunButton.Value = 0;
-            app.ConRunLamp.Color = [1 0 0];
-            app.VacSolSwitch.Value = 'Off';
-            app.VacRunButton.Value = 0;
-            app.VacSolLamp.Color = [1 0 0];
-            fprintf(char(str));
-            fprintf('\n');
-            drawnow
-        case('ESTOP2')
-            app.TabGroup.SelectedTab = app.EStopTab;
-            app.EmergencyStopLamp.Color = [1 0 0];
-            app.DirectionSwitch.Value = 'Backward';
-            app.ConRunButton.Value = 0;
-            app.ConRunLamp.Color = [1 0 0];
-            app.VacSolSwitch.Value = 'Off';
-            app.VacRunButton.Value = 0;
-            app.VacSolLamp.Color = [1 0 0];
-            fprintf(char(str));
-            fprintf('\n');
-            drawnow
-        case('LIGHTCUR')
-            app.TabGroup.SelectedTab = app.LightTab;
-            app.LightCurtainBrokenLamp.Color = [1 0 0];
-            app.DirectionSwitch.Value = 'Backward';
-            app.ConRunButton.Value = 0;
-            app.ConRunLamp.Color = [1 0 0];
-            app.VacSolSwitch.Value = 'Off';
-            app.VacRunButton.Value = 0;
-            app.VacSolLamp.Color = [1 0 0];
-             fprintf(char(str));
-            fprintf('\n');
-            drawnow 
-        case('MOTIONSUS')
-%             go back to home position
-        case('CONVEY')
-            app.TabGroup.SelectedTab = app.ConveyTab;
-            app.ConRunButton.Value = 0;
-            app.ConRunLamp.Color = [1 0 0];
-            app.ConveyorInterlockBrokenLamp.Color = [1 0 0];
-            app.ConRunButton.Value = 0;
-            app.ConRunLamp.Color = [1 0 0];
-            fprintf(char(str));
-            fprintf('\n');
-            drawnow             
-    end        
 end
 
 function SwitchCommand(Switch,socket,state1,command0,command1)   

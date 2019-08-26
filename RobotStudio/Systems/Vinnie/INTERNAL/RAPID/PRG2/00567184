@@ -115,27 +115,4 @@ MODULE ErrorHandling
         
     ENDPROC
     
-!    PROC SendUpdate()
-!        SocketSend client_socket \Str:=(
-!            "STT: " +
-!            NumToStr(DOutput(DO_ESTOP), 0) +
-!            NumToStr(DOutput(DO_ESTOP2), 0) +
-!            NumToStr(DOutput(DO_EXEC_ERR), 0) +
-!            NumToStr(DOutput(DO_HOLD_TO_ENABLE), 0) +
-!            NumToStr(DOutput(DO_LIGHT_CURTAIN), 0) +
-!            NumToStr(DOutput(DO_MOTION_SUP_TRIG), 0) +
-!            NumToStr(DOutput(DO_MOTOR_ON_STATE), 0) +
-!            NumToStr(DOutput(DO_TROB_RUNNING), 0) + 
-!            "\0A");
-        
-!!        estop_ready := DOutput(DO_ESTOP);
-!!        estop_trigg := DOutput(DO_ESTOP2);
-!!        exec_error := DOutput(DO_EXEC_ERR);
-!!        flex_held := DOutput(DO_HOLD_TO_ENABLE);
-!!        light_c_ready := DOutput(DO_LIGHT_CURTAIN);
-!!        motion_suspended :=DOutput(DO_MOTION_SUP_TRIG);
-!!        motor_on := DOutput(DO_MOTOR_ON_STATE);
-!!        motor_running := DOutput(DO_TROB_RUNNING);      
-!    ENDPROC    
-    
 ENDMODULE

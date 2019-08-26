@@ -14,7 +14,9 @@ MODULE MattServer
     VAR num inkThick := 0;
     PERS num DrawPt{500,2};
     VAR num Zeros500{500,2};
+    VAR num arr5{5};
     VAR num count := 1;
+    VAR bool check := FALSE;
     
     PROC Main ()
         TPWrite ">>>>>>S>>>>>>";
@@ -53,8 +55,20 @@ MODULE MattServer
 			CASE "PNP": ! Pick and Place
 				SendACK;
 				TPWrite "Read PNP";
-				GetInStrACK;
-				TPWrite "In_str: " + In_str;
+                FlushSocket;
+                ! Making sure not red badly
+                check := FALSE;
+                WHILE check = FALSE DO
+                    In_Str := "0";
+                    GetInStr;
+                    TPWrite "In_str: " + In_str;
+                    ok := StrToVal(In_str,arr5);
+                    IF arr5{1}<>0 AND arr5{2}<>0 AND arr5{3}<>0 AND arr5{4}<>0 AND arr5{5}<>0 THEN
+                        check := TRUE;
+                    ENDIF
+                ENDWHILE
+                SendACK;
+                TPWrite ValToStr(arr5{1}) + " " + ValToStr(arr5{2}) + " " + ValToStr(arr5{3}) + " " + ValToStr(arr5{4}) + " " + ValToStr(arr5{5});
 				MattMain;
 				
 			CASE "INK": ! Ink print
@@ -132,12 +146,12 @@ MODULE MattServer
 				In_Str := "0";
 				ConBackward;
 				Out_Str := "DONE";
-			
-			CASE "UPD": ! Update
+                
+            CASE "HOM": ! Move to home position
 				SendACK;
-				TPWrite "Read UPD";
+				TPWrite "Read HOM";
 				In_Str := "0";
-				WaitTime(3.0); ! Not implemented yet
+				MoveToHomePos;
 				Out_Str := "DONE";
 
 			DEFAULT:

@@ -51,7 +51,7 @@ function MattCommTest_7Fn(app,runtype)
                 imshow(img)
                 [blob_paths, blob_im, n_letters, thickVector] = text_detection(img);
                 close all;
-                figure; axis equal;
+                figure;
                 for k=1:n_letters
                     blob_letter = blob_paths{k};
                     thickV = thickVector{k};
@@ -76,6 +76,7 @@ function MattCommTest_7Fn(app,runtype)
                             subplot(n_letters,1,k);
                         end 
                         plot(data(:,1),data(:,2))
+                        axis equal;
                         hold on;
 
                         end
@@ -91,6 +92,7 @@ function MattCommTest_7Fn(app,runtype)
             if(runtype == 5) SendMessage(socket_1,"VON"); end
             if(runtype == 6) SendMessage(socket_1,"VOF"); end
             
+            SendMessage(socket_1,"HOM");
             fprintf("Finished program! \n");
             FinishedFlag = true;
         else

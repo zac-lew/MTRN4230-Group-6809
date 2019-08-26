@@ -6,7 +6,6 @@ MODULE MattMove
 
     ! format is xi, yi, xf, yf, yaw angle change;
     VAR num aPnP{5};
-    !VAR string myStrArr := "[-100,300,550,0,45]";
     VAR bool ok;
     
     PROC MattMain()
@@ -20,7 +19,7 @@ MODULE MattMove
             TPWrite "Not yet sent";
             TPWrite "In_str: " + In_str + "   Out_str: " + Out_str; 
         ELSE
-            ok := StrToVal(IN_str,aPnP);
+            ok := StrToVal(In_str,aPnP);
             TPWrite ValToStr(aPnP{1}) + " " + ValToStr(aPnP{2}) + " " + ValToStr(aPnP{3}) + " " + ValToStr(aPnP{4}) + " " + ValToStr(aPnP{5});
             In_Str := "0";
             
