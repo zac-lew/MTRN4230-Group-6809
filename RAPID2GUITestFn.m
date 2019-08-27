@@ -1,4 +1,5 @@
 clc; close all;
+dbstop if error;
 
 %% IMPORTS 
 if( ~exist('detector_updated_FINAL','var')) load('FINAL_FRCNN_V5.mat'); end
@@ -13,10 +14,10 @@ global socket_1 socket_2 Offline;
 
 robot_IP_address = '192.168.125.1'; % Real
 
-%Offline = false;
-Offline = true;
+Offline = false;
+% Offline = true;
 if(Offline)
-    robot_IP_address = '127.0.0.1'; % Simulated
+    %robot_IP_address = '127.0.0.1'; % Simulated
 end
 robot_port_1 = 1025; robot_port_2 = 1026;
 
@@ -27,14 +28,13 @@ set(socket_2, 'BytesAvailableFcn', 'dispcallback');
 
 %% GUI
 global app;
-app = BasicGUINewRev3();
+%app = BasicGUINewRev3();
+app = BasicGUINewRev4();
 disp('GUI OPEN');
 
 while(isequal(get(socket_1, 'Status'), 'open'))
     app.ReadyforCustomerOrderLamp,Color = 'g';
-    %uiwait(gcf); %Continues when figure is closed
-    app.PlacingLetterBlocksLamp.Color = 'g';
-    app.TextArea.Value = 'Placing Chocolates';
+    uiwait(gcf); %Continues when figure is closed
     drawnow
 
     % --------------------------------CALL FUNCTIONS HERE----------------------------------
@@ -46,6 +46,7 @@ while(isequal(get(socket_1, 'Status'), 'open'))
 
     if(app.DirectionSwitch_Changed)
         SwitchCommand(app.DirectionSwitch.Value,socket_1,'Backward','CBK','CFW');
+        %MattCommTest_7Fn(app,8)
         app.DirectionSwitch_Changed = 0;
         drawnow
     end 
@@ -53,20 +54,21 @@ while(isequal(get(socket_1, 'Status'), 'open'))
     if(app.ConRunButton_Pressed)
         ToggleCommand(app.ConRunButton.Value,socket_1,'CON','COF');
         app.ConRunButton_Pressed = 0;
+        
         drawnow
     end
     
-    if(app.ReconnectButton_Pressed)
-        try
-            fopen(socket_1);
-            disp('Reconnected');
-            app.ConnectionStatusLamp.Color = 'g';
-        catch
-            disp('Reconnection Failed');
-            app.ConnectionStatusLamp.Color = 'r';
-        end
-        app.ReconnectButton_Pressed = 0;
-    end
+%     if(app.ReconnectButton_Pressed)
+%         try
+%             fopen(socket_1);
+%             disp('Reconnected');
+%             app.ConnectionStatusLamp.Color = 'g';
+%         catch
+%             disp('Reconnection Failed');
+%             app.ConnectionStatusLamp.Color = 'r';
+%         end
+%         app.ReconnectButton_Pressed = 0;
+%     end
 end
 
 %% Functions

@@ -19,9 +19,10 @@ function [moveConveyorFlag, guiString, shape_color, conv_match_ctr,moveDirection
     % for each frame at a time
     while (true)
         
-        if (failedDetect > 2)
+        if (failedDetect > 3)
                 moveConveyorFlag = true;  
                 moveDirection = 1; %forward
+                scanOnce = false;
                 break;
         end
             
@@ -32,7 +33,9 @@ function [moveConveyorFlag, guiString, shape_color, conv_match_ctr,moveDirection
 
                 %for conveyor camera (get one frame)
                 if(Offline)
-                    cImage = imread('PnPTestC2.jpg');
+                    %cImage = imread('PnPTestC2.jpg');
+                    cImage = MTRN4230_Image_Capture([],[]);
+
                     disp('Photo of Conveyor');
                 else
                     cImage = MTRN4230_Image_Capture([],[]);
@@ -89,6 +92,7 @@ function [moveConveyorFlag, guiString, shape_color, conv_match_ctr,moveDirection
         rectangle('Position',[cBboxes(tempID,1),cBboxes(tempID,2),cBboxes(tempID,3),cBboxes(tempID,4)],'EdgeColor'...
             ,'g','LineWidth',2); 
 
+         fprintf('%Possible %s %s FOUND\n',whatColor(shape_color(2,tempJ)),cLabels(tempID));
         % 2. Check if the matched shape is in right color       
         % Create mask to find pixels with desired RGB ranges (binary mask) -
         % from customer image results
@@ -194,8 +198,8 @@ function [moveConveyorFlag, guiString, shape_color, conv_match_ctr,moveDirection
                            moveDirection = 1; %forward
                            pause(1.0);            
                         else
-                            scanOnce = true;
-                            moveConveyorFlag = false;
+                            scanOnce = false;
+                            moveConveyorFlag = true;
                         end                  
             
                         break;

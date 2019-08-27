@@ -1,5 +1,5 @@
 function [paths, stroke_im, n_letters, letter_thickness] = text_detection(img)
-    debug = 0;
+    debug = 1;
     
     addpath('export-fig\'); % need export-fig to export blob stroke plot
     addpath('douglas-peucker\'); % for line simplification
@@ -100,8 +100,8 @@ end
 
 function [grid_th, grid_offset] = getGridRoi(grey)
     % grid_roi_rect = [470,1112;346,703]; % found with iroi
-    grid_roi_rect = [418,1182;285,789]; % covers all grid squares, including side ones
-    %grid_roi_rect = [542,1055;278,791]; % covers only middle grid squares
+    %grid_roi_rect = [418,1182;285,789]; % covers all grid squares, including side ones
+    grid_roi_rect = [542,1055;278,791]; % covers only middle grid squares
     th = otsu(grey);
     grey_th = (grey >= th); 
     grid_th = iroi(grey_th, grid_roi_rect);
@@ -199,6 +199,12 @@ function [strokes_grid_frame, stroke_im] = calculateStrokes(grid_th, blob, grid_
     roi = blob.bbox + [-1 1; -1 1];
     blob_im = iroi(grid_th, roi);
     skeleton = ithin(1 - blob_im); % use inverse image
+    
+    skeleton(:,1) = 0;
+    skeleton(:, end) = 0;
+    skeleton(1,:) = 0;
+    skeleton(end, :) = 0;
+    
     triple_points = itriplepoint(skeleton);
     end_points = iendpoint(skeleton);
     
@@ -225,6 +231,9 @@ function [strokes_grid_frame, stroke_im] = calculateStrokes(grid_th, blob, grid_
     i = 0;
     
     while n_unexplored > 0
+        if cur_pt(1) == 44 && cur_pt(2) == 1
+            
+        end
         next_pt = getNextPt(cur_pt, prev_pt, skeleton);%, unexplored_tps, n_unexplored);
         prev_pt = cur_pt;        
         %plot_point(cur_pt, 'w.');

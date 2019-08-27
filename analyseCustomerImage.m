@@ -11,7 +11,7 @@ function [shape_color,missingBlockMatch] = analyseCustomerImage(customerImage,ML
 
     % Detect Quirkle Blocks using ML detector
     [bboxes,scores,labels] = detect(detector_updated_FINAL,ROI_image,'Threshold',...
-        ML_threshold,'NumStrongestRegions',15);
+        ML_threshold,'NumStrongestRegions',25);
 
     % Remove double detections from ML
     sorted_detect = sort(scores,'descend');

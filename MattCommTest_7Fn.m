@@ -11,7 +11,8 @@ function MattCommTest_7Fn(app,runtype)
     
     % runtype = 0(pnp then ink), 1 (pnp only), 2 (ink only), 3( conveyor
     % on), 4 (conveyor off), 5 (Vac on), 6 (Vac off), 9 (just take customer image)
-    runtype = 0; % temporary
+    %runtype = 0; % temporary
+    
 
     while(~FinishedFlag)
         if(isequal(get(socket_1, 'Status'), 'open'))
@@ -19,47 +20,20 @@ function MattCommTest_7Fn(app,runtype)
             if(runtype == 0 || runtype == 1 || runtype == 2 || runtype == 9)
                 if(Offline)
                     textImg = iread('table (8).jpg');
-                    customerImage = imread('PnpTestT3.jpg');
+                    customerImage = imread('PnpTestT2.jpg');
                 else
                     % Take photo and set
                     img = MTRN4230_Image_Capture([]); 
                     textImg = img;
                     customerImage = img;
                 end
-            end
+            end       
             
-            if((runtype == 0) || (runtype == 1))
-                %PickNPlace (commented out to save time)
-                % Getting PnP data
-                conv_match_ctr = 0;
-                [shape_color,missingBlockMatch] = analyseCustomerImage(customerImage,0.20,350);
 
-                while(conv_match_ctr ~= (size(shape_color,2) - missingBlockMatch))
-                    [moveConveyorFlag, PnPMessage, shape_color, conv_match_ctr,CmoveDirection] = Detection(conv_match_ctr, shape_color, 275,75);
-                    if(moveConveyorFlag && CmoveDirection == 1)
-                        PulseConv(socket_1,1);
-                    elseif (moveConveyorFlag && CmoveDirection == 0)
-                        PulseConv(socket_1,2);
-                    elseif( PnPMessage.strlength > 1)
-                        SendMessage(socket_1,"PNP");              
-                        SendMessage(socket_1,PnPMessage);
-                        LookForMessage(socket_1,"DONE");
-                        fprintf("\n");
-                        fprintf("Next block \n");
-                    else
-                        fprintf("Bad Message \n");
-                    end
-                    pause(0.5);
-                end
-            end
-            
-            app.TextArea.Value = 'Close Popup to Ink Trace';
-            %uiwait(gcf);
-            
-            app.TracingoutEdibleInkTextLamp.Color = 'g';
-            app.TextArea.Value = 'Ink Tracing...';
 
             if((runtype == 0) || (runtype == 2))
+                app.TracingoutEdibleInkTextLamp.Color = 'g';
+                app.TextArea.Value = 'Ink Tracing...';
                 % Ink
                 fprintf("Starting Ink \n");
                 imshow(textImg)
@@ -101,10 +75,48 @@ function MattCommTest_7Fn(app,runtype)
                 end
             end
 
+            
+            if((runtype == 0) || (runtype == 1))
+                %PickNPlace (commented out to save time)
+                % Getting PnP data
+                app.PlacingLetterBlocksLamp.Color = 'g';
+                
+                app.TextArea.Value = 'Placing Chocolates';
+                conv_match_ctr = 0;
+                [shape_color,missingBlockMatch] = analyseCustomerImage(customerImage,0.35,350);
+
+                while(conv_match_ctr ~= (size(shape_color,2) - missingBlockMatch))
+                    [moveConveyorFlag, PnPMessage, shape_color, conv_match_ctr,CmoveDirection] = Detection(conv_match_ctr, shape_color, 275,75);
+                    if(moveConveyorFlag && CmoveDirection == 1)
+                        PulseConv(socket_1,1);
+                        posMatchNum = 0;
+                        scanOnce = false;
+                    elseif (moveConveyorFlag && CmoveDirection == 0)
+                        PulseConv(socket_1,2);
+                        posMatchNum = 0;
+                        scanOnce = false;
+                    elseif( PnPMessage.strlength > 1)
+                        SendMessage(socket_1,"PNP");              
+                        SendMessage(socket_1,PnPMessage);
+                        LookForMessage(socket_1,"DONE");
+                        fprintf("\n");
+                        fprintf("Next block \n");
+                        posMatchNum = 0;
+                        scanOnce = false;
+                    else
+                        fprintf("Bad Message \n");
+                    end
+                    pause(0.5);
+                end
+            end
+            
+                        
             if(runtype == 3) SendMessage(socket_1,"CON"); end
             if(runtype == 4) SendMessage(socket_1,"COF"); end
             if(runtype == 5) SendMessage(socket_1,"VON"); end
             if(runtype == 6) SendMessage(socket_1,"VOF"); end
+            if(runtype == 7) SendMessage(socket_1,"CFW"); end
+            if(runtype == 8) SendMessage(socket_1,"CBK"); end
             
             SendMessage(socket_1,"HOM");
             fprintf("Finished program! \n");
@@ -121,24 +133,34 @@ end
 %% Functions
 
 function PulseConv(socket_1,conveyorDirection)
+    global app;
+    time  = 1.0;
     if (conveyorDirection == 1)
         % send command for forward direction
         SendMessage(socket_1,"CFW");
         LookForMessage(socket_1,"DONE");
         SendMessage(socket_1,"CON");
         LookForMessage(socket_1,"DONE");
-        pause(0.5);
+        app.ConRunLamp.Color = [0 1 0];
+        app.ConRunButton.Value = 1;
+        pause(time);
         SendMessage(socket_1,"COF");
         LookForMessage(socket_1,"DONE");
+        app.ConRunLamp.Color = [1 0 0];
+        app.ConRunButton.Value = 0;
     else
         % send command for backward direction
-        SendMessage(socket_1,"CFW");
+        SendMessage(socket_1,"CBK");
         LookForMessage(socket_1,"DONE");
         SendMessage(socket_1,"CON");
         LookForMessage(socket_1,"DONE");
-        pause(0.5);
+        app.ConRunLamp.Color = [0 1 0];
+        app.ConRunButton.Value = 1;
+        pause(time);
         SendMessage(socket_1,"COF");
         LookForMessage(socket_1,"DONE");
+        app.ConRunLamp.Color = [1 0 0];
+        app.ConRunButton.Value = 0;
     end    
 end
 
